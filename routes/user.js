@@ -203,11 +203,41 @@ router.get("/getuser", [userauth], async (req, res) => {
     const user = req.user.id;
     const userdetails = await User.findById(user).select("-password");
 
-    if (userdetails) {
-      return res.status(200).json({ userdetails });
-    } else {
+    if (!userdetails) {
       return res.status(404).json({ message: "User not found" });
     }
+
+    // Calculate age from dob
+    const calculateAge = (dob) => {
+      const birthDate = new Date(dob);
+      const today = new Date();
+      let age = today.getFullYear() - birthDate.getFullYear();
+      const monthDifference = today.getMonth() - birthDate.getMonth();
+      if (
+        monthDifference < 0 ||
+        (monthDifference === 0 && today.getDate() < birthDate.getDate())
+      ) {
+        age--;
+      }
+      return age;
+    };
+
+    const age = userdetails.dob ? calculateAge(userdetails.dob) : null;
+
+    const response = {
+      name: userdetails.name,
+      pic: userdetails.pic,
+      email: userdetails.email,
+      age: age,
+      gender: userdetails.gender,
+      country: userdetails.country,
+      position: userdetails.position,
+      foot: userdetails.foot,
+      createdAt: userdetails.createdAt,
+      updatedAt: userdetails.updatedAt,
+    };
+
+    return res.status(200).json({ response });
   } catch (error) {
     res.status(500).json({ message: "Internal server error" });
   }
@@ -264,5 +294,45 @@ router.put(
     }
   }
 );
+
+//Route 6:Updating user detials.sign in required for user...
+router.put("/updateUserDetails", [userauth], async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { name, pic, dob, gender, country, position, foot } = req.body;
+
+    // Build the update object dynamically
+    const updatedFields = {};
+    if (name !== undefined) updatedFields.name = name;
+    if (pic !== undefined) updatedFields.pic = pic;
+    if (dob !== undefined) updatedFields.dob = dob;
+    if (gender !== undefined) updatedFields.gender = gender;
+    if (country !== undefined) updatedFields.country = country;
+    if (position !== undefined) updatedFields.position = position;
+    if (foot !== undefined) updatedFields.foot = foot;
+
+    // Check if there are any fields to update
+    if (Object.keys(updatedFields).length === 0) {
+      return res.status(400).json({ message: "No fields provided to update." });
+    }
+
+    // Find user and update details
+    const user = await User.findByIdAndUpdate(userId, updatedFields, {
+      new: true, // Return the updated document
+      runValidators: true, // Apply schema validation
+    }).select("-password");
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found." });
+    }
+
+    return res.status(200).json({
+      message: "User details updated successfully.",
+      user,
+    });
+  } catch (error) {
+    return res.status(500).json({ message: "Internal server error." });
+  }
+});
 
 module.exports = router;
