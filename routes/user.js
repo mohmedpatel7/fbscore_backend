@@ -101,7 +101,6 @@ router.post(
       .withMessage("Password must be 5-16 characters..!"),
     body("position").isString().withMessage("Position is required..!"),
     body("foot").isString().withMessage("Foot preference is required..!"),
-    body("otp").isNumeric().withMessage("OTP is required..!"),
   ],
   async (req, res) => {
     const errors = validationResult(req);
@@ -109,19 +108,8 @@ router.post(
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const { name, email, dob, country, password, position, foot, otp, gender } =
+    const { name, email, dob, country, password, position, foot, gender } =
       req.body;
-
-    // OTP Verification
-    if (
-      !setOtp[email] ||
-      setOtp[email].otp !== otp ||
-      Date.now() > setOtp[email].expiry
-    ) {
-      return res.status(400).json({ message: "Invalid or expired OTP" });
-    }
-
-    delete setOtp[email]; // OTP is used, delete it
 
     try {
       // Check if user already exists
