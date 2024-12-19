@@ -81,22 +81,38 @@ router.get("/post", async (req, res) => {
     }
 
     const response = {
-      posts: posts.map((post) => ({
-        id: post._id,
-        image: post.image,
-        description: post.description,
-        uploadedBy_name: post.uploadedBy?.name || "Unknown User",
-        uploadedBy_pic: post.uploadedBy?.pic || "",
-        likes: post.likes.length,
-        comment: post.comments.map((comment) => ({
-          id: comment._id,
-          user_name: comment.userId?.name || "Unknown User",
-          user_pic: comment.userId?.pic || "",
-          comments: comment.comment,
-          date: comment.date,
-        })),
-        date: post.date,
-      })),
+      posts: posts.map((post) => {
+        const postDate = new Date(post.date);
+        const currentDate = new Date();
+        const diffInMilliseconds = currentDate - postDate;
+        const daysAgo = Math.floor(diffInMilliseconds / (1000 * 60 * 60 * 24)); // Convert ms to days
+
+        let timeAgo;
+        if (daysAgo > 0) {
+          timeAgo = `${daysAgo} days ago`;
+        } else {
+          const hoursAgo = Math.floor(diffInMilliseconds / (1000 * 60 * 60)); // Convert ms to hours
+          timeAgo = `${hoursAgo} hours ago`;
+        }
+
+        return {
+          id: post._id,
+          image: post.image,
+          description: post.description,
+          uploadedBy_name: post.uploadedBy?.name || "Unknown User",
+          uploadedBy_pic: post.uploadedBy?.pic || "",
+          likes: post.likes.length,
+          comment: post.comments.map((comment) => ({
+            id: comment._id,
+            user_name: comment.userId?.name || "Unknown User",
+            user_pic: comment.userId?.pic || "",
+            comments: comment.comment,
+            date: comment.date,
+          })),
+
+          date: timeAgo,
+        };
+      }),
     };
 
     return res.status(200).json({ response });
@@ -119,22 +135,36 @@ router.get("/siginUserPost", [userauth], async (req, res) => {
     }
 
     const response = {
-      posts: posts.map((post) => ({
-        id: post._id,
-        image: post.image,
-        description: post.description,
-        uploadedBy_name: post.uploadedBy?.name || "Unknown User",
-        uploadedBy_pic: post.uploadedBy?.pic || "",
-        likes: post.likes.length,
-        comment: post.comments.map((comment) => ({
-          id: comment._id,
-          user_name: comment.userId?.name || "Unknown User",
-          user_pic: comment.userId?.pic || "",
-          comments: comment.comment,
-          date: comment.date,
-        })),
-        date: post.date,
-      })),
+      posts: posts.map((post) => {
+        const postDate = new Date(post.date);
+        const currentDate = new Date();
+        const diffInMilliseconds = currentDate - postDate;
+        const daysAgo = Math.floor(diffInMilliseconds / (1000 * 60 * 60 * 24)); // Convert ms to days
+
+        let timeAgo;
+        if (daysAgo > 0) {
+          timeAgo = `${daysAgo} days ago`;
+        } else {
+          const hoursAgo = Math.floor(diffInMilliseconds / (1000 * 60 * 60)); // Convert ms to hours
+          timeAgo = `${hoursAgo} hours ago`;
+        }
+        return {
+          id: post._id,
+          image: post.image,
+          description: post.description,
+          uploadedBy_name: post.uploadedBy?.name || "Unknown User",
+          uploadedBy_pic: post.uploadedBy?.pic || "",
+          likes: post.likes.length,
+          comment: post.comments.map((comment) => ({
+            id: comment._id,
+            user_name: comment.userId?.name || "Unknown User",
+            user_pic: comment.userId?.pic || "",
+            comments: comment.comment,
+            date: timeAgo,
+          })),
+          date: post.date,
+        };
+      }),
     };
 
     return res.status(200).json(response);
