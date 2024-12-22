@@ -92,6 +92,7 @@ router.post(
   [
     body("name").isString().withMessage("Name is required..!"),
     body("email").isEmail().withMessage("Invalid Email..!"),
+    body("otp").isString().withMessage("OTP is required..!"), // Validate OTP
     body("dob").isString().withMessage("Birthdate is required..!"),
     body("gender").isString().withMessage("Gender is required..!"),
     body("country").isString().withMessage("Country is required...!"),
@@ -108,14 +109,27 @@ router.post(
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const { name, email, dob, country, password, position, foot, gender } =
+    const { name, email, otp, dob, country, password, position, foot, gender } =
       req.body;
 
     try {
+      // Validate OTP
+      const otpData = setOtp[email];
+      if (!otpData) {
+        return res.status(400).json({ message: "OTP not sent or expired" });
+      }
+      if (otpData.otp !== otp) {
+        return res.status(400).json({ message: "Invalid OTP" });
+      }
+      if (Date.now() > otpData.expiry) {
+        return res.status(400).json({ message: "OTP expired" });
+      }
+
       // Check if user already exists
       const existingUser = await User.findOne({ email });
-      if (existingUser)
+      if (existingUser) {
         return res.status(400).json({ message: "User already exists" });
+      }
 
       // Hash password
       const salt = await bcrypt.genSalt(10);
@@ -134,6 +148,9 @@ router.post(
         pic: req.file ? req.file.path : defaultProfilePath,
       });
       await user.save();
+
+      // Clear OTP after successful signup
+      delete setOtp[email];
 
       // Generate JWT token
       const token = jwt.sign({ id: user._id }, JWT_SIGN);
