@@ -5,6 +5,10 @@ const Post = require("../schema_models/Post");
 const multer = require("multer");
 const path = require("path");
 const userauth = require("../middleware/userauth");
+const dotenv = require("dotenv");
+
+dotenv.config();
+const baseUrl = process.env.baseurl;
 
 // Define path to default profile picture
 const defaultProfilePath = path.join(__dirname, "../other/defaultprofile.jpg");
@@ -97,15 +101,21 @@ router.get("/post", async (req, res) => {
 
         return {
           id: post._id,
-          image: post.image,
+          image: post.image
+            ? `${baseUrl}/post_dir/${path.basename(post.image)}`
+            : null,
           description: post.description,
           uploadedBy_name: post.uploadedBy?.name || "Unknown User",
-          uploadedBy_pic: post.uploadedBy?.pic || "",
+          uploadedBy_pic: post.uploadedBy?.pic
+            ? `${baseUrl}/uploads/${path.basename(post.uploadedBy?.pic)}`
+            : null,
           likes: post.likes.length,
           comment: post.comments.map((comment) => ({
             id: comment._id,
             user_name: comment.userId?.name || "Unknown User",
-            user_pic: comment.userId?.pic || "",
+            user_pic: comment.userId?.pic
+              ? `${baseUrl}/uploads/${path.basename(comment.userId?.pic)}`
+              : null,
             comments: comment.comment,
             date: comment.date,
           })),
@@ -150,16 +160,22 @@ router.get("/siginUserPost", [userauth], async (req, res) => {
         }
         return {
           id: post._id,
-          image: post.image,
+          image: post.image
+            ? `${baseUrl}/post_dir/${path.basename(post.image)}`
+            : null,
           description: post.description,
           uploadedBy_name: post.uploadedBy?.name || "Unknown User",
-          uploadedBy_pic: post.uploadedBy?.pic || "",
+          uploadedBy_pic: post.uploadedBy?.pic
+            ? `${baseUrl}/uploads/${path.basename(post.uploadedBy?.pic)}`
+            : null,
           likes: post.likes.length,
           comment: post.comments.map((comment) => ({
             id: comment._id,
             user_name: comment.userId?.name || "Unknown User",
             user_pic: comment.userId?.pic || "",
-            comments: comment.comment,
+            user_pic: comment.userId?.pic
+              ? `${baseUrl}/uploads/${path.basename(comment.userId?.pic)}`
+              : null,
             date: timeAgo,
           })),
           date: post.date,

@@ -14,6 +14,7 @@ const userauth = require("../middleware/userauth");
 require("dotenv").config();
 
 const JWT_SIGN = process.env.JWT_SIGN; // Secret key for JWT
+const baseUrl = process.env.baseurl;
 const setOtp = {}; // Temporary storage for OTPs
 
 // Define path to default profile picture
@@ -231,7 +232,9 @@ router.get("/getuser", [userauth], async (req, res) => {
 
     const response = {
       name: userdetails.name,
-      pic: userdetails.pic,
+      pic: userdetails.pic
+        ? `${baseUrl}/uploads/${path.basename(userdetails.pic)}`
+        : null,
       email: userdetails.email,
       age: age,
       gender: userdetails.gender,
