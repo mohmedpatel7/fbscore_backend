@@ -102,19 +102,19 @@ router.get("/post", async (req, res) => {
         return {
           id: post._id,
           image: post.image
-            ? `${baseUrl}/post_dir/${path.basename(post.image)}`
+            ? `${baseUrl}/uploads/posts/${path.basename(post.image)}`
             : null,
           description: post.description,
           uploadedBy_name: post.uploadedBy?.name || "Unknown User",
           uploadedBy_pic: post.uploadedBy?.pic
-            ? `${baseUrl}/uploads/${path.basename(post.uploadedBy?.pic)}`
+            ? `${baseUrl}/uploads/other/${path.basename(post.uploadedBy?.pic)}`
             : null,
           likes: post.likes.length,
           comment: post.comments.map((comment) => ({
             id: comment._id,
             user_name: comment.userId?.name || "Unknown User",
             user_pic: comment.userId?.pic
-              ? `${baseUrl}/uploads/${path.basename(comment.userId?.pic)}`
+              ? `${baseUrl}/uploads/other/${path.basename(comment.userId?.pic)}`
               : null,
             comments: comment.comment,
             date: comment.date,
@@ -161,12 +161,12 @@ router.get("/siginUserPost", [userauth], async (req, res) => {
         return {
           id: post._id,
           image: post.image
-            ? `${baseUrl}/post_dir/${path.basename(post.image)}`
+            ? `${baseUrl}/uploads/posts/${path.basename(post.image)}`
             : null,
           description: post.description,
           uploadedBy_name: post.uploadedBy?.name || "Unknown User",
           uploadedBy_pic: post.uploadedBy?.pic
-            ? `${baseUrl}/uploads/${path.basename(post.uploadedBy?.pic)}`
+            ? `${baseUrl}/uploads/other/${path.basename(post.uploadedBy?.pic)}`
             : null,
           likes: post.likes.length,
           comment: post.comments.map((comment) => ({
@@ -174,7 +174,7 @@ router.get("/siginUserPost", [userauth], async (req, res) => {
             user_name: comment.userId?.name || "Unknown User",
             user_pic: comment.userId?.pic || "",
             user_pic: comment.userId?.pic
-              ? `${baseUrl}/uploads/${path.basename(comment.userId?.pic)}`
+              ? `${baseUrl}/uploads/other/${path.basename(comment.userId?.pic)}`
               : null,
             date: timeAgo,
           })),

@@ -18,7 +18,7 @@ const baseUrl = process.env.baseurl;
 const setOtp = {}; // Temporary storage for OTPs
 
 // Define path to default profile picture
-const defaultProfilePath = path.join(__dirname, "../other/defaultprofile.jpg");
+// const defaultProfilePath = path.join(__dirname, "../other/defaultprofile.jpg");
 
 // Configure multer for profile picture upload
 const storage = multer.diskStorage({
@@ -146,7 +146,7 @@ router.post(
         password: hashedPassword,
         position,
         foot,
-        pic: req.file ? req.file.path : defaultProfilePath,
+        pic: req.file && req.file.path,
       });
       await user.save();
 
@@ -233,7 +233,7 @@ router.get("/getuser", [userauth], async (req, res) => {
     const response = {
       name: userdetails.name,
       pic: userdetails.pic
-        ? `${baseUrl}/uploads/${path.basename(userdetails.pic)}`
+        ? `${baseUrl}/uploads/other/${path.basename(userdetails.pic)}`
         : null,
       email: userdetails.email,
       age: age,
