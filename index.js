@@ -19,6 +19,7 @@ app.use("/api/team", require("./routes/team"));
 app.use("/api/player", require("./routes/player"));
 app.use("/api/match", require("./routes/match"));
 app.use("/api/posts", require("./routes/posts"));
+app.use("/api/admin", require("./routes/admin"));
 
 app.use((err, req, res, next) => {
   console.error("Error stack:", err.stack);

@@ -1,5 +1,6 @@
 const express = require("express");
 const router = express.Router();
+const ReqTeam = require("../schema_models/ReqTeam");
 const Team = require("../schema_models/Team");
 const Player = require("../schema_models/Players");
 const User = require("../schema_models/User");
@@ -7,6 +8,8 @@ const { body, validationResult } = require("express-validator");
 const multer = require("multer");
 const path = require("path");
 const userauth = require("../middleware/userauth");
+
+const setOtp = {}; // Temporary storage for OTPs
 
 // Define path to default profile picture
 const defaultProfilePath = path.join(__dirname, "../other/defaultprofile.jpg");
@@ -36,13 +39,16 @@ const upload = multer({
   },
 });
 
-//Route 1:Creating team using /api/team/createTeam. Login required for user..
+//Route 1:Creating team using /api/team/createTeam.
 router.post(
   "/createTeam",
   upload.single("teamlogo"),
   [
     body("teamname").isString().withMessage("Invalid team name..!"),
     body("country").isString().withMessage("Invalid country..!"),
+    body("email").isEmail().withMessage("Invalid email..!"),
+    body("password").isEmail().withMessage("Invalid password..!"),
+    body("otp").isString().withMessage("Invalid otp..!"),
   ],
   [userauth],
   async (req, res) => {
@@ -52,22 +58,36 @@ router.post(
     }
 
     try {
-      const { teamname, country, teamlogo } = req.body;
+      const { teamname, country, teamlogo, email, password, otp } = req.body;
+
+      // Validate OTP
+      const otpData = setOtp[email];
+      if (!otpData) {
+        return res.status(400).json({ message: "OTP not sent or expired" });
+      }
+      if (otpData.otp !== otp) {
+        return res.status(400).json({ message: "Invalid OTP" });
+      }
+      if (Date.now() > otpData.expiry) {
+        return res.status(400).json({ message: "OTP expired" });
+      }
 
       const team = await Team.findOne({ teamname });
       if (team)
         return res.status(400).json({ message: "Team already exist..!" });
 
-      const teamcreate = new Team({
+      const teamcreate = new ReqTeam({
         teamname,
         teamlogo: req.file ? req.file.path : defaultProfilePath,
         country,
         createdBy: req.user.id,
+        email,
+        password,
       });
       const saved = await teamcreate.save();
       return res
         .status(200)
-        .json({ message: "Team created successfully..!", saved: saved });
+        .json({ message: "Team request sent successfully..!", Data: saved });
     } catch (error) {
       return res.status(500).json({ message: "Internel server errror...!" });
     }
