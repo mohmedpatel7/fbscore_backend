@@ -7,6 +7,9 @@ const jwt = require("jsonwebtoken");
 const nodemailer = require("nodemailer");
 const multer = require("multer");
 const path = require("path");
+const adminauth = require("../middleware/adminauth");
+const ReqTeam = require("../schema_models/ReqTeam");
+const Team = require("../schema_models/Team");
 
 // Load environment variables from .env file
 require("dotenv").config();
@@ -145,5 +148,33 @@ router.post(
     }
   }
 );
+
+//Route 3:Fetching all team requests.Sign in required for admin..
+router.get("/fetchTeamRequests", [adminauth], async (req, res) => {
+  try {
+    const requests = await ReqTeam.find({});
+
+    if (!requests)
+      return res.status(400).json({ message: "No requests found..!" });
+
+    const response = {
+      requests: requests.map((request) => ({
+        requestId: request._id,
+        teamname: request.teamname,
+        teamlogo: request.teamlogo,
+        owner: request.createdBy,
+        country: request.country,
+        email: request.email,
+        password: request.password,
+        createdAt: request.createdAt,
+        updatedAt: request.updatedAt,
+      })),
+    };
+
+    return res.status(200).json({ response });
+  } catch (error) {
+    res.status(500).json({ error: "Server error" });
+  }
+});
 
 module.exports = router;

@@ -75,7 +75,7 @@ router.post(
       await transporter.sendMail({
         from: process.env.EMAIL, // Sender email address
         to: email, // Recipient email address
-        subject: "OTP for Signup", // Email subject
+        subject: "OTP for User Signup", // Email subject
         text: `Your OTP is ${otp}`, // Email body
       });
 
@@ -133,7 +133,7 @@ router.post(
       }
 
       // Hash password
-      const salt = await bcrypt.genSalt(10); 
+      const salt = await bcrypt.genSalt(10);
       const hashedPassword = await bcrypt.hash(password, salt);
 
       // Create and save the user

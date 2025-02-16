@@ -6,8 +6,11 @@ const Player = require("../schema_models/Players");
 const User = require("../schema_models/User");
 const { body, validationResult } = require("express-validator");
 const multer = require("multer");
+const crypto = require("crypto");
+const nodemailer = require("nodemailer");
 const path = require("path");
 const userauth = require("../middleware/userauth");
+const bcrypt = require("bcryptjs");
 
 const setOtp = {}; // Temporary storage for OTPs
 
@@ -39,6 +42,47 @@ const upload = multer({
   },
 });
 
+// Route: Send OTP To Team Owner
+router.post(
+  "/sendotp",
+  [body("email").isEmail().withMessage("Invalid Email..!")],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { email } = req.body;
+    const otp = crypto.randomInt(1000, 9999).toString();
+    const expiry = Date.now() + 2 * 60 * 1000; // 2-minute expiry
+
+    setOtp[email] = { otp, expiry };
+
+    const transporter = nodemailer.createTransport({
+      host: "smtp.gmail.com",
+      port: 587,
+      secure: false, // Use TLS
+      auth: {
+        user: process.env.EMAIL,
+        pass: process.env.PASSWORD,
+      },
+    });
+
+    try {
+      await transporter.sendMail({
+        from: process.env.EMAIL, // Sender email address
+        to: email, // Recipient email address
+        subject: "OTP for User Signup", // Email subject
+        text: `Your OTP is ${otp}`, // Email body
+      });
+
+      return res.status(200).json({ message: "OTP sent to your email." });
+    } catch (error) {
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  }
+);
+
 //Route 1:Creating team using /api/team/createTeam.
 router.post(
   "/createTeam",
@@ -46,8 +90,9 @@ router.post(
   [
     body("teamname").isString().withMessage("Invalid team name..!"),
     body("country").isString().withMessage("Invalid country..!"),
+    body("createdBy").isString().withMessage("Invalid createdBy..!"),
     body("email").isEmail().withMessage("Invalid email..!"),
-    body("password").isEmail().withMessage("Invalid password..!"),
+    body("password").isString().withMessage("Invalid password..!"),
     body("otp").isString().withMessage("Invalid otp..!"),
   ],
   [userauth],
@@ -58,7 +103,7 @@ router.post(
     }
 
     try {
-      const { teamname, country, teamlogo, email, password, otp } = req.body;
+      const { teamname, country, email, password, createdBy, otp } = req.body;
 
       // Validate OTP
       const otpData = setOtp[email];
@@ -76,19 +121,23 @@ router.post(
       if (team)
         return res.status(400).json({ message: "Team already exist..!" });
 
+      const salt = await bcrypt.genSalt(10);
+      const hashedPassword = await bcrypt.hash(password, salt);
+
       const teamcreate = new ReqTeam({
         teamname,
         teamlogo: req.file ? req.file.path : defaultProfilePath,
         country,
-        createdBy: req.user.id,
+        createdBy,
         email,
-        password,
+        password: hashedPassword,
       });
       const saved = await teamcreate.save();
       return res
         .status(200)
         .json({ message: "Team request sent successfully..!", Data: saved });
     } catch (error) {
+      console.log(error);
       return res.status(500).json({ message: "Internel server errror...!" });
     }
   }
