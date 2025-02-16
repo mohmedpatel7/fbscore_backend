@@ -166,7 +166,7 @@ router.post(
       }
 
       const teamOwner = await Team.findOne({ email });
-      if (!email)
+      if (!teamOwner)
         return res.status(404).json({ message: "Invalid email or password.!" });
 
       const isPasswordValid = await bcrypt.compare(
