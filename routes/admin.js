@@ -261,6 +261,7 @@ router.get("/getTeams", [adminauth], async (req, res) => {
 
     const response = {
       teams: teams.map((team) => ({
+        teamId: team._id,
         teamname: team.teamname,
         teamlogo: team.teamlogo,
         country: team.country,

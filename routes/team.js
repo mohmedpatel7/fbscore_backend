@@ -10,6 +10,7 @@ const crypto = require("crypto");
 const nodemailer = require("nodemailer");
 const path = require("path");
 const userauth = require("../middleware/userauth");
+const teamauth = require("../middleware/teamauth");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 
@@ -191,47 +192,46 @@ router.post(
 );
 
 //Route 3:Fetching all details for individuals team..Login required..
-router.get("/getTeamDetails/:teamid", [userauth], async (req, res) => {
-  const { teamid } = req.params;
+router.get(
+  "/getTeamDetails/:teamid",
+  [userauth, teamauth],
+  async (req, res) => {
+    const { teamid } = req.params;
 
-  try {
-    const team = await Team.findById(teamid).populate(
-      "createdBy",
-      "name email"
-    );
-    if (!team) {
-      return res.status(404).json({ message: "Team not found..!" });
-    }
+    try {
+      const team = await Team.findById(teamid);
+      if (!team) {
+        return res.status(404).json({ message: "Team not found..!" });
+      }
 
-    const player = await Player.find({ teamId: teamid }).populate(
-      "userId",
-      "name pic email"
-    );
+      const player = await Player.find({ teamId: teamid });
 
-    return res.status(200).json({
-      message: "Team details fetched.",
-      team: {
-        teamname: team.teamname,
-        teamlogo: team.teamlogo,
-        country: team.country,
-        createdBy: team.createdBy.name,
-      },
-      players: player.map((player) => ({
-        playerId: player._id,
-        playerNo: player.playerNo,
-
-        users: {
-          userId: player.userId._id,
-          name: player.userId.name,
-          pic: player.userId.pic,
-          email: player.userId.email,
+      return res.status(200).json({
+        message: "Team details fetched.",
+        team: {
+          teamname: team.teamname,
+          teamlogo: team.teamlogo,
+          country: team.country,
+          createdBy: team.createdBy,
+          email: team.email,
         },
-      })),
-    });
-  } catch (error) {
-    return res.status(500).json({ message: "Internel server errror...!" });
+        players: player.map((player) => ({
+          playerId: player._id,
+          playerNo: player.playerNo,
+
+          users: {
+            userId: player.userId._id,
+            name: player.userId.name,
+            pic: player.userId.pic,
+            email: player.userId.email,
+          },
+        })),
+      });
+    } catch (error) {
+      return res.status(500).json({ message: "Internel server errror...!" });
+    }
   }
-});
+);
 
 //Route 3:Searching team and user details.Login required..
 router.get("/search", async (req, res) => {
@@ -255,7 +255,7 @@ router.get("/search", async (req, res) => {
       "name pic country"
     );
 
-    //retunr response..
+    //return response..
     return res.json({
       success: true,
       teams_result,
