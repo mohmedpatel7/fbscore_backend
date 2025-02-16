@@ -11,8 +11,14 @@ const nodemailer = require("nodemailer");
 const path = require("path");
 const userauth = require("../middleware/userauth");
 const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
 
 const setOtp = {}; // Temporary storage for OTPs
+
+// Load environment variables from .env file
+require("dotenv").config();
+
+const JWT_SIGN = process.env.JWT_SIGN;
 
 // Define path to default profile picture
 const defaultProfilePath = path.join(__dirname, "../other/defaultprofile.jpg");
@@ -73,7 +79,7 @@ router.post(
         from: process.env.EMAIL, // Sender email address
         to: email, // Recipient email address
         subject: "OTP for User Signup", // Email subject
-        text: `Your OTP is ${otp}`, // Email body
+        text: `Dear User,Your OTP for team regestration is:${otp}This OTP is valid for 2 minutes. Do not share it with anyone.`, // Email body
       });
 
       return res.status(200).json({ message: "OTP sent to your email." });
@@ -143,7 +149,48 @@ router.post(
   }
 );
 
-//Route 2:Fetching all details for individuals team..Login required..
+//Route 2:Team sign in after registration.
+router.post(
+  "/teamSignin",
+  [
+    body("email").isEmail().withMessage("Invalid email or password.!"),
+    body("password").isString().withMessage("Invalid email or password.!"),
+  ],
+  async (req, res) => {
+    try {
+      const { email, password } = req.body;
+
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+      }
+
+      const teamOwner = await Team.findOne({ email });
+      if (!email)
+        return res.status(404).json({ message: "Invalid email or password.!" });
+
+      const isPasswordValid = await bcrypt.compare(
+        password,
+        teamOwner.password
+      );
+      if (!isPasswordValid)
+        return res.status(404).json({ message: "Invalid email or password.!" });
+
+      const payload = {
+        teamOwner: {
+          id: teamOwner.id,
+        },
+      };
+
+      const teamtoken = jwt.sign(payload, JWT_SIGN);
+      return res.status(200).json({ teamtoken });
+    } catch (error) {
+      return res.status(500).json({ message: "Internel server errror...!" });
+    }
+  }
+);
+
+//Route 3:Fetching all details for individuals team..Login required..
 router.get("/getTeamDetails/:teamid", [userauth], async (req, res) => {
   const { teamid } = req.params;
 

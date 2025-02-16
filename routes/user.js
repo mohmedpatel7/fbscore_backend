@@ -76,7 +76,7 @@ router.post(
         from: process.env.EMAIL, // Sender email address
         to: email, // Recipient email address
         subject: "OTP for User Signup", // Email subject
-        text: `Your OTP is ${otp}`, // Email body
+        text: `Dear User,Your OTP for signup verification is:${otp}This OTP is valid for 2 minutes. Do not share it with anyone.`, // Email body
       });
 
       return res.status(200).json({ message: "OTP sent to your email." });
