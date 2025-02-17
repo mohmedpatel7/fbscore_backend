@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
 
-const PlayerSchema = new mongoose.Schema(
+const PlayerRequestSchema = new mongoose.Schema(
   {
     teamId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -31,4 +31,4 @@ const PlayerSchema = new mongoose.Schema(
   }
 );
 
-module.exports = mongoose.model("Player", PlayerSchema);
+module.exports = mongoose.model("PlayerRequest", PlayerRequestSchema);

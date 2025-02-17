@@ -9,7 +9,9 @@ const userauth = (req, res, next) => {
 
   // Check if no token
   if (!token) {
-    return res.status(401).json({ message: "No token, authorization denied" });
+    return res
+      .status(401)
+      .json({ message: "No token, authorization denied user!" });
   }
 
   try {
@@ -24,7 +26,7 @@ const userauth = (req, res, next) => {
   } catch (err) {
     // Handle invalid token
     console.error("Token verification failed:", err); // Debugging line
-    res.status(401).json({ message: "Token is not valid" });
+    res.status(401).json({ message: "Token is not valid for user" });
   }
 };
 

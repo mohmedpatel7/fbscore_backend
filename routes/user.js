@@ -231,6 +231,7 @@ router.get("/getuser", [userauth], async (req, res) => {
     const age = userdetails.dob ? calculateAge(userdetails.dob) : null;
 
     const response = {
+      id: userdetails._id,
       name: userdetails.name,
       pic: userdetails.pic
         ? `${baseUrl}/uploads/other/${path.basename(userdetails.pic)}`

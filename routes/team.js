@@ -1,16 +1,17 @@
 const express = require("express");
 const router = express.Router();
-const ReqTeam = require("../schema_models/ReqTeam");
 const Team = require("../schema_models/Team");
+const ReqTeam = require("../schema_models/ReqTeam");
 const Player = require("../schema_models/Players");
+const PlayerRequest = require("../schema_models/PlayerRequest");
 const User = require("../schema_models/User");
 const { body, validationResult } = require("express-validator");
 const multer = require("multer");
 const crypto = require("crypto");
 const nodemailer = require("nodemailer");
 const path = require("path");
-const userauth = require("../middleware/userauth");
 const teamauth = require("../middleware/teamauth");
+const CommonMiddleware = require("../middleware/CommonMiddleware");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 
@@ -102,7 +103,6 @@ router.post(
     body("password").isString().withMessage("Invalid password..!"),
     body("otp").isString().withMessage("Invalid otp..!"),
   ],
-  [userauth],
   async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -192,48 +192,44 @@ router.post(
 );
 
 //Route 3:Fetching all details for individuals team..Login required..
-router.get(
-  "/getTeamDetails/:teamid",
-  [userauth, teamauth],
-  async (req, res) => {
-    const { teamid } = req.params;
+router.get("/getTeamDetails/:teamid", [CommonMiddleware], async (req, res) => {
+  const { teamid } = req.params;
 
-    try {
-      const team = await Team.findById(teamid);
-      if (!team) {
-        return res.status(404).json({ message: "Team not found..!" });
-      }
-
-      const player = await Player.find({ teamId: teamid });
-
-      return res.status(200).json({
-        message: "Team details fetched.",
-        team: {
-          teamname: team.teamname,
-          teamlogo: team.teamlogo,
-          country: team.country,
-          createdBy: team.createdBy,
-          email: team.email,
-        },
-        players: player.map((player) => ({
-          playerId: player._id,
-          playerNo: player.playerNo,
-
-          users: {
-            userId: player.userId._id,
-            name: player.userId.name,
-            pic: player.userId.pic,
-            email: player.userId.email,
-          },
-        })),
-      });
-    } catch (error) {
-      return res.status(500).json({ message: "Internel server errror...!" });
+  try {
+    const team = await Team.findById(teamid);
+    if (!team) {
+      return res.status(404).json({ message: "Team not found..!" });
     }
-  }
-);
 
-//Route 3:Searching team and user details.Login required..
+    const player = await Player.find({ teamId: teamid });
+
+    return res.status(200).json({
+      message: "Team details fetched.",
+      team: {
+        teamname: team.teamname,
+        teamlogo: team.teamlogo,
+        country: team.country,
+        createdBy: team.createdBy,
+        email: team.email,
+      },
+      players: player.map((player) => ({
+        playerId: player._id,
+        playerNo: player.playerNo,
+
+        users: {
+          userId: player.userId._id,
+          name: player.userId.name,
+          pic: player.userId.pic,
+          email: player.userId.email,
+        },
+      })),
+    });
+  } catch (error) {
+    return res.status(500).json({ message: "Internel server errror...!" });
+  }
+});
+
+//Route 4:Searching team and user details.Login required..
 router.get("/search", async (req, res) => {
   const { searchquery } = req.query; // Get the search term from query params
   try {
@@ -265,5 +261,73 @@ router.get("/search", async (req, res) => {
     return res.status(500).json({ message: "Internal server error..." });
   }
 });
+
+//Route 5:Sending request to player.Signin required fot team owner.
+router.post(
+  "/sendPlayerReq/:userId",
+  [teamauth],
+  [body("playerNo").isNumeric().withMessage("Invalid jersey number!")],
+  async (req, res) => {
+    try {
+      const teamId = req.user.teamId;
+      const { userId } = req.params;
+      const { playerNo } = req.body;
+
+      // Body validation.
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+      }
+
+      // Finding team in db
+      const team = await Team.findById(teamId);
+      if (!team) return res.status(404).json({ message: "Team not found!" });
+
+      // Finding user in db
+      const user = await User.findById(userId);
+      if (!user) return res.status(404).json({ message: "User not found!" });
+
+      // Cheak if the requests already exist ?
+      const existRequest = await PlayerRequest.findOne({ teamId, userId });
+      if (existRequest)
+        return res.status(400).json({ message: "Request already sent!" });
+
+      // Create a new player request
+      const newReq = new PlayerRequest({
+        teamId,
+        teamname: team.teamname,
+        userId,
+        email: user.email,
+        playerNo,
+      });
+
+      // Save the request to the database
+      await newReq.save();
+
+      // Sending email to player..
+      const transporter = nodemailer.createTransport({
+        host: "smtp.gmail.com",
+        port: 587,
+        secure: false,
+        auth: {
+          user: process.env.EMAIL,
+          pass: process.env.PASSWORD,
+        },
+      });
+
+      await transporter.sendMail({
+        from: process.env.EMAIL,
+        to: user.email,
+        subject: "Team Invitation",
+        text: `You have received an invitation to join ${team.teamname} as a player with jersey number ${playerNo}. Please accept or reject the request.`,
+      });
+
+      return res.status(200).json({ newReq });
+    } catch (error) {
+      console.log(error);
+      return res.status(500).json({ message: "Internal server error!" });
+    }
+  }
+);
 
 module.exports = router;

@@ -1,76 +1,43 @@
 const express = require("express");
 const router = express.Router();
 const Team = require("../schema_models/Team");
+const User = require("../schema_models/User");
+const PlayerRequest = require("../schema_models/PlayerRequest");
 const Player = require("../schema_models/Players");
 const { body, validationResult } = require("express-validator");
 const userauth = require("../middleware/userauth");
 
-// Route 1: Add a player to a team. Sign-in required.
-router.post(
-  "/addPlayer",
-  [
-    userauth,
-    body("teamId").isMongoId().withMessage("Team ID is required..!"),
-    body("playerId").isMongoId().withMessage("Player ID is required..!"),
-    body("playerNo")
-      .isString()
-      .withMessage("Player jersey number is required..!"),
-  ],
-  async (req, res) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
+// Route 1: Fetching team requests for signed-in user
+router.get("/getTeamReq", userauth, async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    // Check if user exists
+    const isUser = await User.findById(userId);
+    if (!isUser) return res.status(404).json({ message: "User not found!" });
+
+    // Fetch requests
+    const requests = await PlayerRequest.find({ userId });
+
+    // If no requests found
+    if (requests.length === 0) {
+      return res.status(404).json({ message: "No requests found!" });
     }
 
-    const { teamId, playerId, playerNo } = req.body;
+    const response = {
+      requests: requests.map((req) => ({
+        reqId: req._id,
+        teamname: req.teamname,
+        JeresyNo: req.playerNo,
+        date: req.createdAt,
+      })),
+    };
 
-    try {
-      // Check if the team exists
-      const team = await Team.findById(teamId);
-      if (!team) {
-        return res.status(404).json({ message: "Team not found..!" });
-      }
-
-      // Verify the team owner
-      if (team.createdBy.toString() !== req.user.id) {
-        return res
-          .status(403)
-          .json({ message: "Not authorized to add a player..!" });
-      }
-
-      // Check if the player already belongs to a team
-      const existingPlayer = await Player.findOne({ userId: playerId });
-      if (existingPlayer) {
-        return res
-          .status(400)
-          .json({ message: "Player already belongs to a team..!" });
-      }
-
-      // Check if the jersey number is unique within the team
-      const playernum = await Player.findOne({ teamId, playerNo });
-      if (playernum) {
-        return res
-          .status(400)
-          .json({ message: "Player number already exists in the team..!" });
-      }
-
-      // Save the player data to the collection
-      const playerAdd = new Player({
-        teamId: teamId,
-        userId: playerId,
-        playerNo: playerNo,
-      });
-      await playerAdd.save();
-
-      return res
-        .status(200)
-        .json({ message: "Player added successfully..!", player: playerAdd });
-    } catch (error) {
-      console.error(error);
-      return res.status(500).json({ message: "Internal server error..!" });
-    }
+    return res.status(200).json({ response });
+  } catch (error) {
+    return res.status(500).json({ message: "Internal server error!" });
   }
-);
+});
 
 //Route 2:Fetching player single player details. Login required...
 router.get("/getPlayerDetails/:Pid", [userauth], async (req, res) => {

@@ -9,7 +9,9 @@ const teamauth = (req, res, next) => {
 
   // Check if no token
   if (!token) {
-    return res.status(401).json({ message: "No token, authorization denied" });
+    return res
+      .status(401)
+      .json({ message: "No token, authorization denied team" });
   }
 
   try {
@@ -17,7 +19,7 @@ const teamauth = (req, res, next) => {
     const decoded = jwt.verify(token, JWT_SIGN);
 
     // Attach the user to the request object
-    req.user = { id: decoded.id }; // Updated to match decoded structure
+    req.user = { teamId: decoded.teamOwner?.id }; // Updated to match decoded structure
 
     // Call the next middleware or route handler
     next();
