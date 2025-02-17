@@ -6,10 +6,13 @@ const PlayerRequest = require("../schema_models/PlayerRequest");
 const Player = require("../schema_models/Players");
 const { body, validationResult } = require("express-validator");
 const userauth = require("../middleware/userauth");
+const teamauth = require("../middleware/teamauth");
 const nodemailer = require("nodemailer");
 
 // Load environment variables from .env file
 require("dotenv").config();
+
+const baseUrl = process.env.baseurl;
 
 // Route 1: Fetching team requests for signed-in user
 router.get("/getTeamReq", userauth, async (req, res) => {
@@ -130,6 +133,46 @@ router.post("/userAction/:reqId", [userauth], async (req, res) => {
     return res.status(400).json({ message: "Invalid action!" });
   } catch (error) {
     console.error("Error processing team request:", error);
+    return res.status(500).json({ message: "Internal server error!" });
+  }
+});
+
+//router 3:Fetching all users which are not in any team.
+router.get("/usersWithoutTeam", [teamauth], async (req, res) => {
+  try {
+    // Get all user IDs that are already part of a team
+    const playerList = await Player.find({}, "userId");
+    const playerListIds = playerList.map((player) => player.userId.toString());
+
+    if (playerListIds.length === 0) {
+      return res
+        .status(200)
+        .json({ message: "No users without a team found." });
+    }
+
+    // Fetch all users except those in the playerListIds
+    const userList = await User.find({ _id: { $nin: playerListIds } }).select(
+      "-password"
+    );
+
+    const response = {
+      users: userList.map((user) => ({
+        userId: user._id,
+        name: user.name,
+        pic: user.pic
+          ? `${baseUrl}/uploads/other/${path.basename(user.pic)}`
+          : null,
+        email: user.email,
+        country: user.country,
+        gender: user.gender,
+        dob: user.dob,
+        position: user.position,
+        foot: user.foot,
+      })),
+    };
+
+    return res.status(200).json({ response });
+  } catch (error) {
     return res.status(500).json({ message: "Internal server error!" });
   }
 });

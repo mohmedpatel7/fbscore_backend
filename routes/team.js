@@ -21,6 +21,7 @@ const setOtp = {}; // Temporary storage for OTPs
 require("dotenv").config();
 
 const JWT_SIGN = process.env.JWT_SIGN;
+const baseUrl = process.env.baseurl;
 
 // Define path to default profile picture
 const defaultProfilePath = path.join(__dirname, "../other/defaultprofile.jpg");
@@ -201,7 +202,7 @@ router.get("/getTeamDetails/:teamid", [CommonMiddleware], async (req, res) => {
       return res.status(404).json({ message: "Team not found..!" });
     }
 
-    const player = await Player.find({ teamId: teamid });
+    const player = await Player.find({ teamId: teamid }).populate("userId");
 
     return res.status(200).json({
       message: "Team details fetched.",
@@ -219,8 +220,15 @@ router.get("/getTeamDetails/:teamid", [CommonMiddleware], async (req, res) => {
         users: {
           userId: player.userId._id,
           name: player.userId.name,
-          pic: player.userId.pic,
+          pic: player.userId.pic
+            ? `${baseUrl}/uploads/other/${path.basename(player.userId.pic)}`
+            : null,
           email: player.userId.email,
+          country: player.userId.country,
+          gender: player.userId.gender,
+          dob: player.userId.dob,
+          position: player.userId.position,
+          foot: player.userId.foot,
         },
       })),
     });
