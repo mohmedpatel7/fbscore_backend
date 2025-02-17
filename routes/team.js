@@ -287,6 +287,12 @@ router.post(
       const user = await User.findById(userId);
       if (!user) return res.status(404).json({ message: "User not found!" });
 
+      // Check if the user is already in a team
+      const existingPlayer = await Player.findOne({ userId });
+      if (existingPlayer) {
+        return res.status(400).json({ message: "User is already in a team!" });
+      }
+
       // Cheak if the requests already exist ?
       const existRequest = await PlayerRequest.findOne({ teamId, userId });
       if (existRequest)

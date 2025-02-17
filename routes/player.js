@@ -6,6 +6,10 @@ const PlayerRequest = require("../schema_models/PlayerRequest");
 const Player = require("../schema_models/Players");
 const { body, validationResult } = require("express-validator");
 const userauth = require("../middleware/userauth");
+const nodemailer = require("nodemailer");
+
+// Load environment variables from .env file
+require("dotenv").config();
 
 // Route 1: Fetching team requests for signed-in user
 router.get("/getTeamReq", userauth, async (req, res) => {
@@ -35,6 +39,97 @@ router.get("/getTeamReq", userauth, async (req, res) => {
 
     return res.status(200).json({ response });
   } catch (error) {
+    return res.status(500).json({ message: "Internal server error!" });
+  }
+});
+
+// Route 2: Users action on team requests (Login required)
+router.post("/userAction/:reqId", [userauth], async (req, res) => {
+  try {
+    const { reqId } = req.params;
+    const { action } = req.body;
+
+    // Fetch PlayerRequest and populate both team and user data
+    const requestExist = await PlayerRequest.findById(reqId)
+      .populate("teamId")
+      .populate("userId");
+    if (!requestExist) {
+      return res.status(404).json({ message: "Request not found!" });
+    }
+
+    // Authorization check (Ensure only the request owner can act)
+    if (requestExist.userId._id.toString() !== req.user.id) {
+      return res.status(403).json({ message: "You are not authorized!" });
+    }
+
+    const team = requestExist.teamId; // Since populated, it already contains team data
+    if (!team) {
+      return res.status(404).json({ message: "Team not found!" });
+    }
+
+    // Check if the user is already part of another team
+    const existingPlayer = await Player.findOne({
+      userId: requestExist.userId._id,
+    });
+    if (existingPlayer) {
+      return res.status(400).json({
+        message: `You are already part of the team: ${existingPlayer.teamname}.`,
+      });
+    }
+
+    // Configure nodemailer transporter
+    const transporter = nodemailer.createTransport({
+      host: "smtp.gmail.com",
+      port: 587,
+      secure: false, // Use TLS
+      auth: {
+        user: process.env.EMAIL,
+        pass: process.env.PASSWORD,
+      },
+    });
+
+    // Handle accept action
+    if (action === "accept") {
+      const player = new Player({
+        teamId: team._id,
+        teamname: team.teamname,
+        userId: requestExist.userId._id,
+        email: requestExist.email,
+        playerNo: requestExist.playerNo,
+      });
+
+      await player.save();
+      await PlayerRequest.findByIdAndDelete(reqId);
+
+      await transporter.sendMail({
+        from: process.env.EMAIL,
+        to: team.email,
+        subject: "Player Added to Team",
+        text: `A new player (Jersey No: ${player.playerNo}) has been added to your team: ${team.teamname}`,
+      });
+
+      return res
+        .status(200)
+        .json({ message: "Player added successfully!", player });
+    }
+
+    // Handle reject action
+    else if (action === "reject") {
+      await PlayerRequest.findByIdAndDelete(reqId);
+
+      await transporter.sendMail({
+        from: process.env.EMAIL,
+        to: team.email,
+        subject: "Player Rejected Team Invitation",
+        text: `The player (Jersey No: ${requestExist.playerNo}) has rejected the invitation to join your team: ${team.teamname}.`,
+      });
+
+      return res.status(200).json({ message: "Request rejected!" });
+    }
+
+    return res.status(400).json({ message: "Invalid action!" });
+  } catch (error) {
+    console.error("Error processing team request:", error);
     return res.status(500).json({ message: "Internal server error!" });
   }
 });
