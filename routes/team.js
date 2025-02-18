@@ -250,7 +250,7 @@ router.get("/search", async (req, res) => {
     //finding search result for teams..
     const teams_result = await Team.find(
       { teamname: { $regex: searchRegex } },
-      "teamname teamlogo country"
+      "teamname teamlogo country createdBy"
     );
 
     //finding search result for users..
@@ -259,11 +259,32 @@ router.get("/search", async (req, res) => {
       "name pic country"
     );
 
+    const team_response = {
+      teams: teams_result.map((team) => ({
+        teamname: team.teamname,
+        teamlogo: team.teamlogo
+          ? `${baseUrl}/uploads/other/${path.basename(team.teamlogo)}`
+          : null,
+        country: team.country,
+        owner: team.createdBy,
+      })),
+    };
+
+    const user_response = {
+      users: user_result.map((user) => ({
+        name: user.name,
+        pic: user.pic
+          ? `${baseUrl}/uploads/other/${path.basename(user.pic)}`
+          : null,
+        country: user.country,
+      })),
+    };
+
     //return response..
     return res.json({
       success: true,
-      teams_result,
-      user_result,
+      team_response,
+      user_response,
     });
   } catch (error) {
     return res.status(500).json({ message: "Internal server error..." });
