@@ -365,4 +365,47 @@ router.post(
   }
 );
 
+//Route 6:Removing single player from team.Login required for team owner.
+router.delete("/removePlayer/:playerid", [teamauth], async (req, res) => {
+  const { playerid } = req.params;
+  try {
+    // Find the player to be removed and check if it exists
+    const player = await Player.findById(playerid).populate("userId");
+    if (!player)
+      return res.status(404).josn({ message: "Player not found..!" });
+
+    const team = await Team.findById(player.teamId);
+    if (!team) return res.status(404).json({ message: "Team not found..!" });
+
+    if (team._id.toString() !== req.user.teamId)
+      return res
+        .status(403)
+        .json({ message: "You are not authorized to remove this player" });
+
+    await Player.findByIdAndDelete(playerid);
+
+    // Send email to player
+    const transporter = nodemailer.createTransport({
+      host: "smtp.gmail.com",
+      port: 587,
+      secure: false,
+      auth: {
+        user: process.env.EMAIL,
+        pass: process.env.PASSWORD,
+      },
+    });
+
+    await transporter.sendMail({
+      from: process.env.EMAIL,
+      to: player.userId.email,
+      subject: "Team Notice",
+      text: `You have been released from ${team.teamname} as a player.`,
+    });
+
+    return res.status(200).json({ message: "Player removed successfully!" });
+  } catch (error) {
+    return res.status(500).json({ message: "Internal server error..!" });
+  }
+});
+
 module.exports = router;

@@ -178,7 +178,7 @@ router.get("/usersWithoutTeam", [teamauth], async (req, res) => {
   }
 });
 
-//Route 2:Fetching player single player details. Login required...
+//Route 4:Fetching player single player details. Login required...
 router.get("/getPlayerDetails/:Pid", [userauth], async (req, res) => {
   const { Pid } = req.params;
 
@@ -223,30 +223,6 @@ router.get("/getPlayerDetails/:Pid", [userauth], async (req, res) => {
         },
       },
     });
-  } catch (error) {
-    return res.status(500).json({ message: "Internal server error..!" });
-  }
-});
-
-//Route3:Removing single player from team.Login required for team owner.
-router.delete("/removePlayer/:playerid", [userauth], async (req, res) => {
-  const { playerid } = req.params;
-  try {
-    // Find the player to be removed and check if it exists
-    const player = await Player.findById(playerid);
-    if (!player)
-      return res.status(404).josn({ message: "Player not found..!" });
-
-    const team = await Team.findById(player.teamId);
-    if (!team) return res.status(404).json({ message: "Team not found..!" });
-
-    if (team.createdBy.toString() !== req.user.id)
-      return res
-        .status(403)
-        .json({ message: "You are not authorized to remove this player" });
-
-    await Player.findByIdAndDelete(playerid);
-    return res.status(200).json({ message: "Player removed successfully!" });
   } catch (error) {
     return res.status(500).json({ message: "Internal server error..!" });
   }
