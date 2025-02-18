@@ -8,6 +8,7 @@ const { body, validationResult } = require("express-validator");
 const userauth = require("../middleware/userauth");
 const teamauth = require("../middleware/teamauth");
 const nodemailer = require("nodemailer");
+const path = require("path");
 
 // Load environment variables from .env file
 require("dotenv").config();
@@ -185,7 +186,7 @@ router.get("/getPlayerDetails/:Pid", [userauth], async (req, res) => {
     // Fetch the player details and populate associated team and user info
     const player = await Player.findById(Pid)
       .populate("teamId", "teamname teamlogo country")
-      .populate("userId", "name pic");
+      .populate("userId", "name pic country gender position foot dob");
 
     // If player not found, respond with 404
     if (!player) {
@@ -201,13 +202,24 @@ router.get("/getPlayerDetails/:Pid", [userauth], async (req, res) => {
         team: {
           teamId: player.teamId._id,
           teamname: player.teamId.teamname,
-          teamlogo: player.teamId.teamlogo,
+          teamlogo: player.teamId.teamlogo
+            ? `${baseUrl}/uploads/other/${path.basename(
+                player.teamId.teamlogo
+              )}`
+            : null,
           country: player.teamId.country,
         },
         user: {
           userId: player.userId._id,
           name: player.userId.name,
-          pic: player.userId.pic,
+          pic: player.userId.pic
+            ? `${baseUrl}/uploads/other/${path.basename(player.userId.pic)}`
+            : null,
+          country: player.userId.country,
+          gender: player.userId.gender,
+          position: player.userId.position,
+          foot: player.userId.foot,
+          dob: player.userId.dob,
         },
       },
     });
