@@ -25,7 +25,6 @@ const teamauth = (req, res, next) => {
     next();
   } catch (err) {
     // Handle invalid token
-    console.error("Token verification failed:", err); // Debugging line
     res.status(401).json({ message: "Token is not valid" });
   }
 };

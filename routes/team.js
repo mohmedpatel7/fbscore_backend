@@ -368,39 +368,56 @@ router.post(
 //Route 6:Removing single player from team.Login required for team owner.
 router.delete("/removePlayer/:playerid", [teamauth], async (req, res) => {
   const { playerid } = req.params;
+
   try {
-    // Find the player to be removed and check if it exists
+    // Find the player and check if they exist
     const player = await Player.findById(playerid).populate("userId");
-    if (!player)
-      return res.status(404).josn({ message: "Player not found..!" });
+    if (!player) {
+      return res.status(404).json({ message: "Player not found..!" });
+    }
 
+    // Find the team and check if it exists
     const team = await Team.findById(player.teamId);
-    if (!team) return res.status(404).json({ message: "Team not found..!" });
+    if (!team) {
+      return res.status(404).json({ message: "Team not found..!" });
+    }
 
-    if (team._id.toString() !== req.user.teamId)
+    // Ensure the player belongs to this team
+    if (!player.teamId || player.teamId.toString() !== team._id.toString()) {
       return res
         .status(403)
-        .json({ message: "You are not authorized to remove this player" });
+        .json({ message: "This player does not belong to your team." });
+    }
 
+    // Ensure the requester is the team owner
+    if (team._id.toString() !== req.user.teamId.toString()) {
+      return res
+        .status(403)
+        .json({ message: "You are not authorized to remove this player." });
+    }
+
+    // Remove player
     await Player.findByIdAndDelete(playerid);
 
-    // Send email to player
-    const transporter = nodemailer.createTransport({
-      host: "smtp.gmail.com",
-      port: 587,
-      secure: false,
-      auth: {
-        user: process.env.EMAIL,
-        pass: process.env.PASSWORD,
-      },
-    });
+    // Send email if player has an email
+    if (player.userId && player.userId.email) {
+      const transporter = nodemailer.createTransport({
+        host: "smtp.gmail.com",
+        port: 587,
+        secure: false,
+        auth: {
+          user: process.env.EMAIL,
+          pass: process.env.PASSWORD,
+        },
+      });
 
-    await transporter.sendMail({
-      from: process.env.EMAIL,
-      to: player.userId.email,
-      subject: "Team Notice",
-      text: `You have been released from ${team.teamname} as a player.`,
-    });
+      await transporter.sendMail({
+        from: process.env.EMAIL,
+        to: player.userId.email,
+        subject: "Team Notice",
+        text: `You have been released from ${team.teamname} as a player.`,
+      });
+    }
 
     return res.status(200).json({ message: "Player removed successfully!" });
   } catch (error) {
