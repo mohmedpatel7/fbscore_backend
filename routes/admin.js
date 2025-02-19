@@ -2,14 +2,15 @@ const express = require("express");
 const router = express.Router();
 const bcrypt = require("bcryptjs");
 const Admin = require("../schema_models/Admin");
+const Team = require("../schema_models/Team");
+const ReqTeam = require("../schema_models/ReqTeam");
+const Player = require("../schema_models/Players");
 const { body, validationResult } = require("express-validator");
 const jwt = require("jsonwebtoken");
 const nodemailer = require("nodemailer");
 const multer = require("multer");
 const path = require("path");
 const adminauth = require("../middleware/adminauth");
-const ReqTeam = require("../schema_models/ReqTeam");
-const Team = require("../schema_models/Team");
 
 // Load environment variables from .env file
 require("dotenv").config();
@@ -275,6 +276,53 @@ router.get("/getTeams", [adminauth], async (req, res) => {
     return res.status(200).json({ response });
   } catch (error) {
     return res.status(500).json({ error: "Server error" });
+  }
+});
+
+//Route 6:Fetching individual team details for admin.
+router.get("/getTeamDetails/:teamid", [adminauth], async (req, res) => {
+  const { teamid } = req.params;
+
+  try {
+    const team = await Team.findById(teamid);
+    if (!team) {
+      return res.status(404).json({ message: "Team not found..!" });
+    }
+
+    const player = await Player.find({ teamId: teamid }).populate("userId");
+
+    return res.status(200).json({
+      message: "Team details fetched.",
+      team: {
+        teamname: team.teamname,
+        teamlogo: team.teamlogo
+          ? `${baseUrl}/uploads/other/${path.basename(team.teamlogo)}`
+          : null,
+        country: team.country,
+        createdBy: team.createdBy,
+        email: team.email,
+      },
+      players: player.map((player) => ({
+        playerId: player._id,
+        playerNo: player.playerNo,
+
+        users: {
+          userId: player.userId._id,
+          name: player.userId.name,
+          pic: player.userId.pic
+            ? `${baseUrl}/uploads/other/${path.basename(player.userId.pic)}`
+            : null,
+          email: player.userId.email,
+          country: player.userId.country,
+          gender: player.userId.gender,
+          dob: player.userId.dob,
+          position: player.userId.position,
+          foot: player.userId.foot,
+        },
+      })),
+    });
+  } catch (error) {
+    return res.status(500).json({ message: "Internel server errror...!" });
   }
 });
 

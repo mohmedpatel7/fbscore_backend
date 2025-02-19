@@ -11,7 +11,6 @@ const crypto = require("crypto");
 const nodemailer = require("nodemailer");
 const path = require("path");
 const teamauth = require("../middleware/teamauth");
-const CommonMiddleware = require("../middleware/CommonMiddleware");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 
@@ -193,7 +192,7 @@ router.post(
 );
 
 //Route 3:Fetching all details for individuals team..Login required..
-router.get("/getTeamDetails/:teamid", [CommonMiddleware], async (req, res) => {
+router.get("/getTeamDetails/:teamid", [teamauth], async (req, res) => {
   const { teamid } = req.params;
 
   try {
@@ -208,7 +207,9 @@ router.get("/getTeamDetails/:teamid", [CommonMiddleware], async (req, res) => {
       message: "Team details fetched.",
       team: {
         teamname: team.teamname,
-        teamlogo: team.teamlogo,
+        teamlogo: team.teamlogo
+          ? `${baseUrl}/uploads/other/${path.basename(team.teamlogo)}`
+          : null,
         country: team.country,
         createdBy: team.createdBy,
         email: team.email,
