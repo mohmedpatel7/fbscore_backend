@@ -426,4 +426,54 @@ router.delete("/removePlayer/:playerid", [teamauth], async (req, res) => {
   }
 });
 
+//Route 7:Fetching player single player details. Login required...
+router.get("/getPlayerDetails/:Pid", [teamauth], async (req, res) => {
+  const { Pid } = req.params;
+
+  try {
+    // Fetch the player details and populate associated team and user info
+    const player = await Player.findById(Pid)
+      .populate("teamId", "teamname teamlogo country")
+      .populate("userId", "name pic country gender position foot dob");
+
+    // If player not found, respond with 404
+    if (!player) {
+      return res.status(404).json({ message: "Player details not found..!" });
+    }
+
+    // Respond with player details
+    return res.status(200).json({
+      message: "Details fetched successfully!",
+      player: {
+        playerId: player._id,
+        playerNo: player.playerNo,
+        team: {
+          teamId: player.teamId._id,
+          teamname: player.teamId.teamname,
+          teamlogo: player.teamId.teamlogo
+            ? `${baseUrl}/uploads/other/${path.basename(
+                player.teamId.teamlogo
+              )}`
+            : null,
+          country: player.teamId.country,
+        },
+        user: {
+          userId: player.userId._id,
+          name: player.userId.name,
+          pic: player.userId.pic
+            ? `${baseUrl}/uploads/other/${path.basename(player.userId.pic)}`
+            : null,
+          country: player.userId.country,
+          gender: player.userId.gender,
+          position: player.userId.position,
+          foot: player.userId.foot,
+          dob: player.userId.dob,
+        },
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({ message: "Internal server error..!" });
+  }
+});
+
 module.exports = router;
