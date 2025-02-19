@@ -360,7 +360,6 @@ router.post(
 
       return res.status(200).json({ newReq });
     } catch (error) {
-      console.log(error);
       return res.status(500).json({ message: "Internal server error!" });
     }
   }
@@ -426,7 +425,7 @@ router.delete("/removePlayer/:playerid", [teamauth], async (req, res) => {
   }
 });
 
-//Route 7:Fetching player single player details. Login required...
+//Route 7:Fetching single player details. Login required for team owner...
 router.get("/getPlayerDetails/:Pid", [teamauth], async (req, res) => {
   const { Pid } = req.params;
 

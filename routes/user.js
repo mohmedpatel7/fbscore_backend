@@ -269,8 +269,7 @@ router.get("/getuser", [userauth], async (req, res) => {
 
     return res.status(200).json({ response });
   } catch (error) {
-    console.log(error);
-    res.status(500).json({ message: "Internal server error" });
+    return res.status(500).json({ message: "Internal server error" });
   }
 });
 
@@ -366,7 +365,7 @@ router.put("/updateUserDetails", [userauth], async (req, res) => {
   }
 });
 
-//Route 7:Fetching all details for individuals team..Login required..
+//Route 7:Fetching all details for individuals team..Login required for user..
 router.get("/getTeamDetails/:teamid", [userauth], async (req, res) => {
   const { teamid } = req.params;
 

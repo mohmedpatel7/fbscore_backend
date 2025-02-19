@@ -281,7 +281,7 @@ router.get("/getTeams", [adminauth], async (req, res) => {
   }
 });
 
-//Route 6:Fetching individual team details for admin.
+//Route 6:Fetching individual team details for admin.Sign in required for admin.
 router.get("/getTeamDetails/:teamid", [adminauth], async (req, res) => {
   const { teamid } = req.params;
 
@@ -328,7 +328,7 @@ router.get("/getTeamDetails/:teamid", [adminauth], async (req, res) => {
   }
 });
 
-//Route 7:Fetching player single player details. Login required...
+//Route 7:Fetching single player details. Sign in required for admin...
 router.get("/getPlayerDetails/:Pid", [adminauth], async (req, res) => {
   const { Pid } = req.params;
 
@@ -378,7 +378,7 @@ router.get("/getPlayerDetails/:Pid", [adminauth], async (req, res) => {
   }
 });
 
-//router 8:Fetching all users which are not in any team.
+//router 8:Fetching all users which are not in any team.Sign in required for admin.
 router.get("/usersWithoutTeam", [adminauth], async (req, res) => {
   try {
     // Get all user IDs that are already part of a team

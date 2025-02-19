@@ -15,7 +15,7 @@ require("dotenv").config();
 
 const baseUrl = process.env.baseurl;
 
-// Route 1: Fetching team requests for signed-in user
+// Route 1: Fetching team requests for sign in user.
 router.get("/getTeamReq", userauth, async (req, res) => {
   try {
     const userId = req.user.id;
@@ -47,7 +47,7 @@ router.get("/getTeamReq", userauth, async (req, res) => {
   }
 });
 
-// Route 2: Users action on team requests (Login required)
+// Route 2: Users action on team requests.Sign in reuired for user.
 router.post("/userAction/:reqId", [userauth], async (req, res) => {
   try {
     const { reqId } = req.params;
@@ -133,12 +133,11 @@ router.post("/userAction/:reqId", [userauth], async (req, res) => {
 
     return res.status(400).json({ message: "Invalid action!" });
   } catch (error) {
-    console.error("Error processing team request:", error);
     return res.status(500).json({ message: "Internal server error!" });
   }
 });
 
-//router 3:Fetching all users which are not in any team.
+//router 3:Fetching all users which are not in any team.Sign in reuired for team owner.
 router.get("/usersWithoutTeam", [teamauth], async (req, res) => {
   try {
     // Get all user IDs that are already part of a team
@@ -178,7 +177,7 @@ router.get("/usersWithoutTeam", [teamauth], async (req, res) => {
   }
 });
 
-//Route 4:Fetching player single player details. Login required...
+//Route 4:Fetching player single player details. Sign in required for user...
 router.get("/getPlayerDetails/:Pid", [userauth], async (req, res) => {
   const { Pid } = req.params;
 
