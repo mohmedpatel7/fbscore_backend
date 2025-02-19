@@ -232,6 +232,9 @@ router.get("/getuser", [userauth], async (req, res) => {
 
     const age = userdetails.dob ? calculateAge(userdetails.dob) : null;
 
+    //If user is part of any team.
+    const isPlayer = await Player.findOne({ userId: user }).populate("teamId");
+
     const response = {
       id: userdetails._id,
       name: userdetails.name,
@@ -246,10 +249,27 @@ router.get("/getuser", [userauth], async (req, res) => {
       foot: userdetails.foot,
       createdAt: userdetails.createdAt,
       updatedAt: userdetails.updatedAt,
+
+      playerDetails: isPlayer
+        ? {
+            playerId: isPlayer.playerId,
+            teamname: isPlayer.teamname,
+            teamlogo: isPlayer.teamId.teamlogo
+              ? `${baseUrl}/uploads/other/${path.basename(
+                  isPlayer.teamId.teamlogo
+                )}`
+              : null,
+            jeresyNo: isPlayer.playerNo,
+            teamcountry: isPlayer.teamId.country,
+            teamowner: isPlayer.teamId.createdBy,
+            teamemail: isPlayer.teamId.email,
+          }
+        : null,
     };
 
     return res.status(200).json({ response });
   } catch (error) {
+    console.log(error);
     res.status(500).json({ message: "Internal server error" });
   }
 });
