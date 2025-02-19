@@ -6,6 +6,8 @@ const Team = require("../schema_models/Team");
 const ReqTeam = require("../schema_models/ReqTeam");
 const Player = require("../schema_models/Players");
 const User = require("../schema_models/User");
+const MatchOfficial = require("../schema_models/MatchOfficial");
+const ReqMatchOfficial = require("../schema_models/ReqMatchOfficial");
 const { body, validationResult } = require("express-validator");
 const jwt = require("jsonwebtoken");
 const nodemailer = require("nodemailer");
@@ -409,6 +411,28 @@ router.get("/usersWithoutTeam", [adminauth], async (req, res) => {
         dob: user.dob,
         position: user.position,
         foot: user.foot,
+      })),
+    };
+
+    return res.status(200).json({ response });
+  } catch (error) {
+    return res.status(500).json({ message: "Internal server error!" });
+  }
+});
+
+// Route 9:Fetching match official requist.Sign in required for admin.
+router.get("/fetchMatchOfficialReq", [adminauth], async (req, res) => {
+  try {
+    const requist = await ReqMatchOfficial.find({});
+    if (!requist)
+      return res.status(200).json({ message: "No match requists found!" });
+
+    const response = {
+      requist: requist.map((req) => ({
+        reqId: req._id,
+        name: req.name,
+        email: req.email,
+        password: req.password,
       })),
     };
 

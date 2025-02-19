@@ -100,7 +100,10 @@ router.post(
     body("country").isString().withMessage("Invalid country..!"),
     body("createdBy").isString().withMessage("Invalid createdBy..!"),
     body("email").isEmail().withMessage("Invalid email..!"),
-    body("password").isString().withMessage("Invalid password..!"),
+    body("password")
+      .isString()
+      .isLength({ min: 6, max: 18 })
+      .withMessage("Invalid password..!"),
     body("otp").isString().withMessage("Invalid otp..!"),
   ],
   async (req, res) => {
@@ -144,7 +147,6 @@ router.post(
         .status(200)
         .json({ message: "Team request sent successfully..!", Data: saved });
     } catch (error) {
-      console.log(error);
       return res.status(500).json({ message: "Internel server errror...!" });
     }
   }

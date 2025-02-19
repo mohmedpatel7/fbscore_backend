@@ -2,7 +2,7 @@ const mongoose = require("mongoose");
 
 const ReqMatchOfficialSchema = mongoose.Schema(
   {
-    OfficialName: {
+    name: {
       type: String,
       required: true,
     },

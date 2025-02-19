@@ -4,8 +4,123 @@ const Team = require("../schema_models/Team");
 const Player = require("../schema_models/Players");
 const Match = require("../schema_models/Match");
 const PlayerStats = require("../schema_models/Stats");
+const MatchOfficial = require("../schema_models/MatchOfficial");
+const ReqMatchOfficial = require("../schema_models/ReqMatchOfficial");
 const { body, validationResult } = require("express-validator");
 const userauth = require("../middleware/userauth");
+const crypto = require("crypto");
+const nodemailer = require("nodemailer");
+const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
+
+const setOtp = {}; // Temporary storage for OTPs
+
+// Load environment variables from .env file
+require("dotenv").config();
+
+const JWT_SIGN = process.env.JWT_SIGN;
+const baseUrl = process.env.baseurl;
+
+// Route: Send OTP To Team Owner
+router.post(
+  "/sendotp",
+  [body("email").isEmail().withMessage("Invalid Email..!")],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { email } = req.body;
+    const otp = crypto.randomInt(1000, 9999).toString();
+    const expiry = Date.now() + 2 * 60 * 1000; // 2-minute expiry
+
+    setOtp[email] = { otp, expiry };
+
+    const transporter = nodemailer.createTransport({
+      host: "smtp.gmail.com",
+      port: 587,
+      secure: false, // Use TLS
+      auth: {
+        user: process.env.EMAIL,
+        pass: process.env.PASSWORD,
+      },
+    });
+
+    try {
+      await transporter.sendMail({
+        from: process.env.EMAIL, // Sender email address
+        to: email, // Recipient email address
+        subject: "OTP for User Signup", // Email subject
+        text: `Dear User,Your OTP for match official regestration is:${otp}This OTP is valid for 2 minutes. Do not share it with anyone.`, // Email body
+      });
+
+      return res.status(200).json({ message: "OTP sent to your email." });
+    } catch (error) {
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  }
+);
+
+// Route 1:Match official acount requist to admin.
+router.post(
+  "/matchOfficialSignup",
+  [
+    body("name").isString().withMessage("Name must be string!"),
+    body("email").isEmail().withMessage("Invlaid email!"),
+    body("password")
+      .isString()
+      .isLength({ min: 6, max: 18 })
+      .withMessage("Invalid password..!"),
+    body("otp").isString().withMessage("Invalid otp..!"),
+  ],
+  async (req, res) => {
+    try {
+      const { name, email, password, otp } = req.body;
+
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+      }
+
+      // Validate OTP
+      const otpData = setOtp[email];
+      if (!otpData) {
+        return res.status(400).json({ message: "OTP not sent or expired" });
+      }
+      if (otpData.otp !== otp) {
+        return res.status(400).json({ message: "Invalid OTP" });
+      }
+      if (Date.now() > otpData.expiry) {
+        return res.status(400).json({ message: "OTP expired" });
+      }
+
+      const isMatchOfficial = await MatchOfficial.findOne({ email });
+      if (isMatchOfficial)
+        return res
+          .status(400)
+          .json({ message: "Match official already exist!" });
+
+      const salt = await bcrypt.genSalt(10);
+      const hashedPassword = await bcrypt.hash(password, salt);
+
+      const newMatchOfficial = new ReqMatchOfficial({
+        name,
+        email,
+        password: hashedPassword,
+      });
+
+      await newMatchOfficial.save();
+      return res.status(200).json({
+        messgae: "Match official requist has been sent to admin.",
+        newMatchOfficial,
+      });
+    } catch (error) {
+      console.log(error);
+      return res.status(500).json({ message: "Internal server error", error });
+    }
+  }
+);
 
 //Route 1:Create match.Login required..
 router.post("/createMatch", [userauth], async (req, res) => {
