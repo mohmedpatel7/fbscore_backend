@@ -184,10 +184,11 @@ router.get("/getMatchOfficial", [matchofficialauth], async (req, res) => {
   }
 });
 
-//Route 1:Create match.Login required..
-router.post("/createMatch", [userauth], async (req, res) => {
+// Route 4: Create match (sign-in required for match official)
+router.post("/createMatch", [matchofficialauth], async (req, res) => {
   try {
-    const { teamA, teamB, createdBy, match_date, match_time } = req.body;
+    const { teamA, teamB, match_date, match_time } = req.body;
+    const createdBy = req.user.id; // Assign match official's ID
 
     // Check for validation errors
     const errors = validationResult(req);
@@ -271,13 +272,13 @@ router.post("/createMatch", [userauth], async (req, res) => {
       )
     );
 
-    res.status(201).json({ success: true, match: newMatch });
+    return res.status(201).json({ success: true, match: newMatch });
   } catch (error) {
-    res.status(500).json({ message: "Internal server error", error });
+    return res.status(500).json({ message: "Internal server error", error });
   }
 });
 
-//Route 2:Updating match status.Login required for match creator..
+//Route 2:Updating match status.sign in required for match creator..
 router.put("/updateStatus/:matchId", [userauth], async (req, res) => {
   try {
     const { matchId } = req.params;
@@ -308,7 +309,7 @@ router.put("/updateStatus/:matchId", [userauth], async (req, res) => {
       });
     }
 
-    // Auto-set status to "delayed" if match date/time has passed and status is still "pending"
+    // Auto-set status to "delayed" if match date/time has passed and status is still "Upcoming"
     const currentTime = new Date();
     if (
       match.status === "Upcoming" &&

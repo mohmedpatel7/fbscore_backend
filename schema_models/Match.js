@@ -40,10 +40,6 @@ const Match = new mongoose.Schema(
       type: String, // Example: "15:30" (24-hour format) or "03:30 PM"
       required: true,
     },
-    date: {
-      type: Date,
-      default: Date.now,
-    },
     status: {
       type: String,
       enum: ["Upcoming", "Live", "Half Time", "Full Time", "Delayed"], // Predefined statuses
