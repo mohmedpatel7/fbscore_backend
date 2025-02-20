@@ -502,4 +502,24 @@ router.post("/matchOfficialAction/:reqId", [adminauth], async (req, res) => {
   }
 });
 
+// Route 11:Fetching match official details.Sign in required for admin.
+router.get("/getMatchOfficial", [adminauth], async (req, res) => {
+  try {
+    const matchofficial = await MatchOfficial.find({});
+    if (!matchofficial)
+      return res.status(404).json({ message: "No data found!" });
+
+    const response = {
+      matchofficial: matchofficial.map((list) => ({
+        name: list.name,
+        email: list.email,
+      })),
+    };
+
+    return res.status(200).json({ response });
+  } catch (error) {
+    return res.status(500).json({ message: "Internal server error", error });
+  }
+});
+
 module.exports = router;
