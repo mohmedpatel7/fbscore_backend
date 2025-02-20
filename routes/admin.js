@@ -148,8 +148,7 @@ router.post(
 
       res.json({ admintoken });
     } catch (error) {
-      console.error(error);
-      res.status(500).json({ error: "Server error" });
+      return res.status(500).json({ error: "Server error" });
     }
   }
 );
@@ -187,12 +186,6 @@ router.post("/adminAcTeam/:reqId", [adminauth], async (req, res) => {
   try {
     const { action } = req.body;
     const { reqId } = req.params;
-
-    // Check for validation errors
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
-    }
 
     if (!reqId) return res.status(404).json({ Message: "Id not provided.!" });
 
@@ -437,6 +430,73 @@ router.get("/fetchMatchOfficialReq", [adminauth], async (req, res) => {
     };
 
     return res.status(200).json({ response });
+  } catch (error) {
+    return res.status(500).json({ message: "Internal server error!" });
+  }
+});
+
+//Route 10:Admin action on match official requist.Sign in required for admin.
+router.post("/matchOfficialAction/:reqId", [adminauth], async (req, res) => {
+  try {
+    const { action } = req.body;
+    const { reqId } = req.params;
+
+    // validate fot requist id.
+    if (!reqId)
+      return res.status(400).json({ message: "Requist id is required!" });
+
+    // Cheak if requiest is exist ?
+    const isRequist = await ReqMatchOfficial.findById(reqId);
+    if (!isRequist)
+      return res
+        .status(404)
+        .json({ message: "Match official requist not found!" });
+
+    //Mail configuration.
+    const transporter = nodemailer.createTransport({
+      host: "smtp.gmail.com",
+      port: 587,
+      secure: false, // Use TLS
+      auth: {
+        user: process.env.EMAIL,
+        pass: process.env.PASSWORD,
+      },
+    });
+
+    if (action === "accept") {
+      //Create new match official account.
+      const newMatchOfficial = new MatchOfficial({
+        name: isRequist.name,
+        email: isRequist.email,
+        password: isRequist.password,
+      });
+      // save
+      await newMatchOfficial.save();
+      await ReqMatchOfficial.findByIdAndDelete(reqId);
+
+      //sending mail.
+      transporter.sendMail({
+        from: process.env.EMAIL,
+        to: isRequist.email,
+        subject: "Match official requist.",
+        text: `Dear ${isRequist.name},Your requist for the match official has been accepted by fbscore,signin with ${isRequist.email} and password.`,
+      });
+
+      return res
+        .status(200)
+        .json({ message: "Requist accepted successfully." });
+    } else if (action === "reject") {
+      await ReqMatchOfficial.findByIdAndDelete(reqId);
+
+      //sending mail.
+      transporter.sendMail({
+        from: process.env.EMAIL,
+        to: isRequist.email,
+        subject: "Match official requist.",
+        text: `Dear ${isRequist.name},Your requist for the match official has been rejected by fbscore,You can apply again later.`,
+      });
+      return res.json({ Message: "request rejected." });
+    }
   } catch (error) {
     return res.status(500).json({ message: "Internal server error!" });
   }

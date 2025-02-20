@@ -7,6 +7,7 @@ const PlayerStats = require("../schema_models/Stats");
 const MatchOfficial = require("../schema_models/MatchOfficial");
 const ReqMatchOfficial = require("../schema_models/ReqMatchOfficial");
 const { body, validationResult } = require("express-validator");
+const matchofficialauth = require("../middleware/matchofficialauth");
 const userauth = require("../middleware/userauth");
 const crypto = require("crypto");
 const nodemailer = require("nodemailer");
@@ -116,11 +117,72 @@ router.post(
         newMatchOfficial,
       });
     } catch (error) {
-      console.log(error);
       return res.status(500).json({ message: "Internal server error", error });
     }
   }
 );
+
+// Route 2:Match official sign in after acount creation.
+router.post(
+  "/matchOfficialSignin",
+  [
+    body("email").isEmail().withMessage("Invalid email or password!"),
+    body("password").isString().withMessage("Invalid email or password!"),
+  ],
+  async (req, res) => {
+    try {
+      // Check for validation errors
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+      }
+
+      const { email, password } = req.body;
+
+      //Verifying email.
+      const isUser = await MatchOfficial.findOne({ email });
+      if (!isUser)
+        return res.status(404).json({ message: "Invalid email or password!" });
+
+      //verifying password.
+      const isPasswordValid = await bcrypt.compare(password, isUser.password);
+      if (!isPasswordValid)
+        return res.status(404).json({ message: "Invalid email or password!" });
+
+      const payload = {
+        isUser: {
+          id: isUser.id,
+        },
+      };
+
+      const matchOfficialtoken = jwt.sign(payload, JWT_SIGN);
+
+      return res.status(200).json({ matchOfficialtoken });
+    } catch (error) {
+      return res.status(500).json({ message: "Internal server error", error });
+    }
+  }
+);
+
+// Route 3:Fetching match offcial details.signin reuired.
+router.get("/getMatchOfficial", [matchofficialauth], async (req, res) => {
+  try {
+    const id = req.user.id;
+
+    const matchofficial = await MatchOfficial.findOne({ id });
+    if (!matchofficial)
+      return res.status(404).json({ message: "No data found!" });
+
+    const response = {
+      name: matchofficial.name,
+      email: matchofficial.email,
+    };
+
+    return res.status(200).json({ response });
+  } catch (error) {
+    return res.status(500).json({ message: "Internal server error", error });
+  }
+});
 
 //Route 1:Create match.Login required..
 router.post("/createMatch", [userauth], async (req, res) => {
