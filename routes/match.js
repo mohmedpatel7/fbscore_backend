@@ -13,6 +13,7 @@ const crypto = require("crypto");
 const nodemailer = require("nodemailer");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const path = require("path");
 
 const setOtp = {}; // Temporary storage for OTPs
 
@@ -278,8 +279,8 @@ router.post("/createMatch", [matchofficialauth], async (req, res) => {
   }
 });
 
-//Route 2:Updating match status.sign in required for match creator..
-router.put("/updateStatus/:matchId", [userauth], async (req, res) => {
+// Route 5: Updating match status. Sign-in required for match creator
+router.put("/updateStatus/:matchId", [matchofficialauth], async (req, res) => {
   try {
     const { matchId } = req.params;
     const { status } = req.body;
@@ -296,45 +297,45 @@ router.put("/updateStatus/:matchId", [userauth], async (req, res) => {
       return res.status(400).json({ message: "Invalid status provided!" });
     }
 
-    //Fetch match
+    // Fetch match
     const match = await Match.findById(matchId);
     if (!match) {
-      return res.status(400).json({ message: "Match not found..!" });
+      return res.status(404).json({ message: "Match not found!" });
     }
 
-    //Validate match update by only creator..
-    if (match.createdBy.toString() !== req.user.id) {
+    // Validate match update by only creator
+    if (match.createdBy?.toString() !== req.user.id) {
       return res.status(403).json({
         message: "You are not authorized to update this match status",
       });
     }
 
-    // Auto-set status to "delayed" if match date/time has passed and status is still "Upcoming"
+    // Auto-set status to "Delayed" if match date/time has passed and status is still "Upcoming"
     const currentTime = new Date();
     if (
       match.status === "Upcoming" &&
-      new Date(match.match_date) < currentTime
+      new Date(`${match.match_date}T${match.match_time}`) < currentTime
     ) {
       match.status = "Delayed";
       await match.save();
       return res
         .status(201)
-        .json({ message: "Match status set to delayed auto..!", match });
+        .json({ message: "Match status set to delayed automatically!", match });
     }
 
-    //Update status manually..
+    // Update status manually
     match.status = status;
     await match.save();
-    res
+    return res
       .status(201)
       .json({ message: "Match status updated successfully!", match });
   } catch (error) {
-    res.status(500).json({ message: "Internal Server Error" });
+    return res.status(500).json({ message: "Internal Server Error" });
   }
 });
 
-//Route 3:Serach match between two teams.Sign in required for user..
-router.get("/searchMatch", [userauth], async (req, res) => {
+// Route 6: Search match between two teams. Sign-in required for everyone
+router.get("/searchMatch", [matchofficialauth], async (req, res) => {
   try {
     const { teamname } = req.query;
 
@@ -364,15 +365,22 @@ router.get("/searchMatch", [userauth], async (req, res) => {
       .populate("teamA", "teamname teamlogo")
       .populate("teamB", "teamname teamlogo");
 
+    // Handle no matches found
+    if (!matches || matches.length === 0) {
+      return res
+        .status(404)
+        .json({ message: `No matches found for '${teamname}'!` });
+    }
+
     // Return the matches
-    res.status(200).json({ success: true, matches });
+    return res.status(200).json({ success: true, matches });
   } catch (error) {
-    res.status(500).json({ message: "Internal Server Error", error });
+    return res.status(500).json({ message: "Internal Server Error", error });
   }
 });
 
-//Route 4:Updating match and player stats.Sign in required for match creator.
-router.put("/updateMatchStats", [userauth], async (req, res) => {
+//Route 7:Updating match and player stats.Sign in required for match creator.
+router.put("/updateMatchStats", [matchofficialauth], async (req, res) => {
   try {
     const { matchId, scorerId, assistId, teamId } = req.body;
 
@@ -504,12 +512,12 @@ router.put("/updateMatchStats", [userauth], async (req, res) => {
       .status(200)
       .json({ message: "Stats and match updated successfully." });
   } catch (error) {
-    res.status(500).json({ message: "Internal Server Error", error });
+    return res.status(500).json({ message: "Internal Server Error", error });
   }
 });
 
 //Route 5:Fetching individual match details.Sign in required for user.
-router.get("/matchDetails/:matchId", [userauth], async (req, res) => {
+router.get("/matchDetails/:matchId", [matchofficialauth], async (req, res) => {
   try {
     const { matchId } = req.params;
 
@@ -556,22 +564,30 @@ router.get("/matchDetails/:matchId", [userauth], async (req, res) => {
         teamA: {
           id: match.teamA._id,
           name: match.teamA.teamname,
-          logo: match.teamA.teamlogo,
+          logo: match.teamA.teamlogo
+            ? `${baseUrl}/uploads/other/${path.basename(match.teamA.teamlogo)}`
+            : null,
           players: teamAPlayers.map((player) => ({
             id: player._id,
             name: player.userId.name,
-            pic: player.userId.pic,
+            pic: player.userId.pic
+              ? `${baseUrl}/uploads/other/${path.basename(player.userId.pic)}`
+              : null,
             position: player.userId.position,
           })),
         },
         teamB: {
           id: match.teamB._id,
           name: match.teamB.teamname,
-          logo: match.teamB.teamlogo,
+          logo: match.teamB.teamlogo
+            ? `${baseUrl}/uploads/other/${path.basename(match.teamB.teamlogo)}`
+            : null,
           players: teamBPlayers.map((player) => ({
             id: player._id,
             name: player.userId.name,
-            pic: player.userId.pic,
+            pic: player.userId.pic
+              ? `${baseUrl}/uploads/other/${path.basename(player.userId.pic)}`
+              : null,
             position: player.userId.position,
           })),
         },
@@ -586,20 +602,30 @@ router.get("/matchDetails/:matchId", [userauth], async (req, res) => {
         team: {
           id: goal.team._id,
           name: goal.team.teamname,
-          logo: goal.team.teamlogo,
+          logo: goal.team.teamlogo
+            ? `${baseUrl}/uploads/other/${path.basename(goal.team.teamlogo)}`
+            : null,
         },
         scorer: goal.scorer
           ? {
               id: goal.scorer._id,
               name: goal.scorer.userId.name,
-              pic: goal.scorer.userId.pic,
+              pic: goal.scorer.userId.pic
+                ? `${baseUrl}/uploads/other/${path.basename(
+                    goal.scorer.userId.pic
+                  )}`
+                : null,
             }
           : null,
         assist: goal.assist
           ? {
               id: goal.assist._id,
               name: goal.assist.userId.name,
-              pic: goal.assist.userId.pic,
+              pic: goal.assist.userId.pic
+                ? `${baseUrl}/uploads/other/${path.basename(
+                    goal.assist.userId.pic
+                  )}`
+                : null,
             }
           : null,
       })),
@@ -609,7 +635,7 @@ router.get("/matchDetails/:matchId", [userauth], async (req, res) => {
       .status(200)
       .json({ message: "Data fetched successfully", data: response });
   } catch (error) {
-    res.status(500).json({ message: "Internal Server Error", error });
+    return res.status(500).json({ message: "Internal Server Error", error });
   }
 });
 
@@ -620,7 +646,7 @@ router.get("/matches", async (req, res) => {
       .populate("teamA", "teamname teamlogo")
       .populate("teamB", "teamname teamlogo");
 
-    if (!matches) {
+    if (matches.length === 0) {
       return res.status(404).json({ message: "No matches found" });
     }
 
@@ -630,12 +656,16 @@ router.get("/matches", async (req, res) => {
         teamA: {
           id: match.teamA._id,
           name: match.teamA.teamname,
-          logo: match.teamA.teamlogo,
+          logo: match.teamA.teamlogo
+            ? `${baseUrl}/uploads/other/${path.basename(match.teamA.teamlogo)}`
+            : null,
         },
         teamB: {
           id: match.teamB._id,
           name: match.teamB.teamname,
-          logo: match.teamB.teamlogo,
+          logo: match.teamB.teamlogo
+            ? `${baseUrl}/uploads/other/${path.basename(match.teamB.teamlogo)}`
+            : null,
         },
         status: match.status,
         score: match.score,
@@ -644,9 +674,11 @@ router.get("/matches", async (req, res) => {
       })),
     };
 
-    return res.status(200).json({ Data: response });
+    return res
+      .status(200)
+      .json({ message: "Matches fetched successfully", data: response });
   } catch (error) {
-    res.status(500).json({ message: "Internal Server Error", error });
+    return res.status(500).json({ message: "Internal Server Error", error });
   }
 });
 
