@@ -8,6 +8,7 @@ const Player = require("../schema_models/Players");
 const User = require("../schema_models/User");
 const MatchOfficial = require("../schema_models/MatchOfficial");
 const ReqMatchOfficial = require("../schema_models/ReqMatchOfficial");
+const Match = require("../schema_models/Match");
 const { body, validationResult } = require("express-validator");
 const jwt = require("jsonwebtoken");
 const nodemailer = require("nodemailer");
@@ -519,6 +520,129 @@ router.get("/getMatchOfficial", [adminauth], async (req, res) => {
     return res.status(200).json({ response });
   } catch (error) {
     return res.status(500).json({ message: "Internal server error", error });
+  }
+});
+
+//Route 12:Fetching individual match details.Sign in required for user.
+router.get("/matchDetails/:matchId", [adminauth], async (req, res) => {
+  try {
+    const { matchId } = req.params;
+
+    const match = await Match.findById(matchId)
+      .populate("teamA", "teamname teamlogo")
+      .populate("teamB", "teamname teamlogo")
+      .populate("createdBy", "name")
+      .populate({
+        path: "goals.scorer",
+        populate: {
+          path: "userId",
+          select: "name pic",
+        },
+      })
+      .populate({
+        path: "goals.assist",
+        populate: {
+          path: "userId",
+          select: "name pic",
+        },
+      })
+      .populate("goals.team", "teamname teamlogo");
+
+    if (!match) {
+      return res.status(404).json({ message: "Match not found" });
+    }
+
+    const teamAPlayers = await Player.find({
+      teamId: match.teamA._id,
+    }).populate("userId", "name pic position");
+
+    const teamBPlayers = await Player.find({
+      teamId: match.teamB._id,
+    }).populate("userId", "name pic position");
+
+    // Restructure the response
+    const response = {
+      matchId: match._id,
+      matchDate: match.match_date,
+      matchTime: match.match_time,
+      status: match.status,
+      createdBy: match.createdBy.name,
+      teams: {
+        teamA: {
+          id: match.teamA._id,
+          name: match.teamA.teamname,
+          logo: match.teamA.teamlogo
+            ? `${baseUrl}/uploads/other/${path.basename(match.teamA.teamlogo)}`
+            : null,
+          players: teamAPlayers.map((player) => ({
+            id: player._id,
+            name: player.userId.name,
+            pic: player.userId.pic
+              ? `${baseUrl}/uploads/other/${path.basename(player.userId.pic)}`
+              : null,
+            position: player.userId.position,
+          })),
+        },
+        teamB: {
+          id: match.teamB._id,
+          name: match.teamB.teamname,
+          logo: match.teamB.teamlogo
+            ? `${baseUrl}/uploads/other/${path.basename(match.teamB.teamlogo)}`
+            : null,
+          players: teamBPlayers.map((player) => ({
+            id: player._id,
+            name: player.userId.name,
+            pic: player.userId.pic
+              ? `${baseUrl}/uploads/other/${path.basename(player.userId.pic)}`
+              : null,
+            position: player.userId.position,
+          })),
+        },
+      },
+      score: {
+        teamA: match.score.teamA,
+        teamB: match.score.teamB,
+      },
+      goals: match.goals.map((goal) => ({
+        id: goal._id,
+        timestamp: goal.timestamp,
+        team: {
+          id: goal.team._id,
+          name: goal.team.teamname,
+          logo: goal.team.teamlogo
+            ? `${baseUrl}/uploads/other/${path.basename(goal.team.teamlogo)}`
+            : null,
+        },
+        scorer: goal.scorer
+          ? {
+              id: goal.scorer._id,
+              name: goal.scorer.userId.name,
+              pic: goal.scorer.userId.pic
+                ? `${baseUrl}/uploads/other/${path.basename(
+                    goal.scorer.userId.pic
+                  )}`
+                : null,
+            }
+          : null,
+        assist: goal.assist
+          ? {
+              id: goal.assist._id,
+              name: goal.assist.userId.name,
+              pic: goal.assist.userId.pic
+                ? `${baseUrl}/uploads/other/${path.basename(
+                    goal.assist.userId.pic
+                  )}`
+                : null,
+            }
+          : null,
+      })),
+    };
+
+    return res
+      .status(200)
+      .json({ message: "Data fetched successfully", data: response });
+  } catch (error) {
+    return res.status(500).json({ message: "Internal Server Error", error });
   }
 });
 
