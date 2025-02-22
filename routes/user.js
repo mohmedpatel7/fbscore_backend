@@ -157,8 +157,8 @@ router.post(
       delete setOtp[email];
 
       // Generate JWT token
-      const token = jwt.sign({ id: user._id }, JWT_SIGN);
-      res.status(201).json({ token });
+      const usertoken = jwt.sign({ id: user._id }, JWT_SIGN);
+      res.status(201).json({ usertoken });
     } catch (error) {
       res.status(500).json({ message: "Internal server error" });
     }
@@ -194,8 +194,8 @@ router.post(
       }
 
       // Generate JWT token
-      const token = jwt.sign({ id: user._id }, JWT_SIGN);
-      res.status(201).json({ token });
+      const usertoken = jwt.sign({ id: user._id }, JWT_SIGN);
+      res.status(201).json({ usertoken });
     } catch (error) {
       res.status(500).json({ message: "Internal server error" });
     }

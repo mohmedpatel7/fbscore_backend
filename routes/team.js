@@ -195,8 +195,8 @@ router.post(
 );
 
 //Route 3:Fetching all details for individuals team..Login required..
-router.get("/getTeamDetails/:teamid", [teamauth], async (req, res) => {
-  const { teamid } = req.params;
+router.get("/getTeamDetails", [teamauth], async (req, res) => {
+  const teamid = req.user.teamId;
 
   try {
     const team = await Team.findById(teamid);
