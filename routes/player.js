@@ -141,21 +141,42 @@ router.post("/userAction/:reqId", [userauth], async (req, res) => {
 //router 3:Fetching all users which are not in any team.Sign in reuired for team owner.
 router.get("/usersWithoutTeam", [teamauth], async (req, res) => {
   try {
-    // Get all user IDs that are already part of a team
+    // Get all player records and extract user IDs
     const playerList = await Player.find({}, "userId");
+
     const playerListIds = playerList.map((player) => player.userId.toString());
 
-    if (playerListIds.length === 0) {
+    // If playerListIds is empty, fetch all users (since no users are assigned to a team)
+    let query = {};
+    if (playerListIds.length > 0) {
+      query = { _id: { $nin: playerListIds } };
+    }
+
+    // Fetch all users who are NOT in the player list
+    const userList = await User.find(query).select("-password");
+
+    if (userList.length === 0) {
       return res
         .status(200)
         .json({ message: "No users without a team found." });
     }
 
-    // Fetch all users except those in the playerListIds
-    const userList = await User.find({ _id: { $nin: playerListIds } }).select(
-      "-password"
-    );
+    // Calculate age from dob
+    const calculateAge = (dob) => {
+      const birthDate = new Date(dob);
+      const today = new Date();
+      let age = today.getFullYear() - birthDate.getFullYear();
+      const monthDifference = today.getMonth() - birthDate.getMonth();
+      if (
+        monthDifference < 0 ||
+        (monthDifference === 0 && today.getDate() < birthDate.getDate())
+      ) {
+        age--;
+      }
+      return age;
+    };
 
+    // Format response
     const response = {
       users: userList.map((user) => ({
         userId: user._id,
@@ -166,13 +187,13 @@ router.get("/usersWithoutTeam", [teamauth], async (req, res) => {
         email: user.email,
         country: user.country,
         gender: user.gender,
-        dob: user.dob,
+        age: calculateAge(user.dob),
         position: user.position,
         foot: user.foot,
       })),
     };
 
-    return res.status(200).json({ response });
+    return res.status(200).json(response);
   } catch (error) {
     return res.status(500).json({ message: "Internal server error!" });
   }

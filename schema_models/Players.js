@@ -23,7 +23,6 @@ const PlayerSchema = new mongoose.Schema(
     playerNo: {
       type: String,
       required: true,
-      unique: true,
     },
   },
   {
