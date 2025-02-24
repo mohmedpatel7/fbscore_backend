@@ -601,4 +601,48 @@ router.get("/matchDetails/:matchId", [teamauth], async (req, res) => {
   }
 });
 
+// Route 9: Fetching signed-in team matches
+router.get("/signinMatches", [teamauth], async (req, res) => {
+  try {
+    const teamId = req.user.teamId;
+
+    // Find matches where the team is participating
+    const Matches = await Match.find({
+      $or: [{ teamA: teamId }, { teamB: teamId }],
+    }).populate("teamA teamB", "teamname teamlogo");
+
+    if (!Matches.length) {
+      return res.status(404).json({ message: "No matches found!" });
+    }
+
+    // Format the response
+    const response = Matches.map((match) => ({
+      matchId: match._id,
+      teamA: match.teamA
+        ? {
+            id: match.teamA._id,
+            teamname: match.teamA.teamname,
+            teamlogo: match.teamA.teamlogo,
+          }
+        : null,
+      teamB: match.teamB
+        ? {
+            id: match.teamB._id,
+            teamname: match.teamB.teamname,
+            teamlogo: match.teamB.teamlogo,
+          }
+        : null,
+      score: match.score,
+      date: match.match_date,
+      time: match.match_time,
+      status: match.status,
+    }));
+
+    return res.status(200).json({ matches: response });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: "Internal Server Error", error });
+  }
+});
+
 module.exports = router;

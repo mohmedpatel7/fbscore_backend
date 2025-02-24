@@ -9,6 +9,7 @@ const userauth = require("../middleware/userauth");
 const teamauth = require("../middleware/teamauth");
 const nodemailer = require("nodemailer");
 const path = require("path");
+const Match = require("../schema_models/Match");
 
 // Load environment variables from .env file
 require("dotenv").config();
@@ -224,6 +225,53 @@ router.get("/getPlayerDetails/:Pid", [userauth], async (req, res) => {
     });
   } catch (error) {
     return res.status(500).json({ message: "Internal server error..!" });
+  }
+});
+
+// Route 5:Fetching signin player matches.
+router.get("/signinPlayerMatches", [userauth], async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    // Find the player using the user ID
+    const player = await Player.findOne({ userId });
+    if (!player) {
+      return res.status(404).json({ message: "Player not found!" });
+    }
+
+    // Find matches where the player's team is either teamA or teamB
+    const matches = await Match.find({
+      $or: [{ teamA: player.teamId }, { teamB: player.teamId }],
+    }).populate("teamA teamB", "teamname teamlogo");
+
+    if (!matches.length) {
+      return res
+        .status(404)
+        .json({ message: "No matches found for your team!" });
+    }
+
+    // Formatting the response
+    const response = matches.map((match) => ({
+      matchId: match._id,
+      teamA: {
+        id: match.teamA._id,
+        name: match.teamA.teamname,
+        logo: match.teamA.teamlogo,
+      },
+      teamB: {
+        id: match.teamB._id,
+        name: match.teamB.teamname,
+        logo: match.teamB.teamlogo,
+      },
+      score: match.score,
+      date: match.match_date,
+      time: match.match_time,
+      status: match.status,
+    }));
+
+    return res.status(200).json({ matches: response });
+  } catch (error) {
+    return res.status(500).json({ message: "Internal Server Error", error });
   }
 });
 

@@ -682,4 +682,52 @@ router.get("/matches", async (req, res) => {
   }
 });
 
+// Route 7: Fetch matches created by the signed-in match official
+router.get("/createdMatches", [matchofficialauth], async (req, res) => {
+  try {
+    const officialId = req.user.id; // Extract match official ID from authentication
+
+    // Find matches created by the logged-in match official
+    const Matches = await Match.find({ createdBy: officialId })
+      .populate("teamA teamB", "teamname teamlogo") // Populate team details
+      .populate("createdBy", "name email"); // Populate match official details
+
+    if (!Matches.length) {
+      return res.status(404).json({ message: "No matches found!" });
+    }
+
+    // Format the response
+    const response = Matches.map((match) => ({
+      matchId: match._id,
+      teamA: match.teamA
+        ? {
+            id: match.teamA._id,
+            teamname: match.teamA.teamname,
+            teamlogo: match.teamA.teamlogo,
+          }
+        : null,
+      teamB: match.teamB
+        ? {
+            id: match.teamB._id,
+            teamname: match.teamB.teamname,
+            teamlogo: match.teamB.teamlogo,
+          }
+        : null,
+      score: match.score,
+      date: match.match_date,
+      time: match.match_time,
+      status: match.status,
+      createdBy: {
+        id: match.createdBy._id,
+        name: match.createdBy.name,
+      },
+    }));
+
+    return res.status(200).json({ matches: response });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: "Internal Server Error", error });
+  }
+});
+
 module.exports = router;
