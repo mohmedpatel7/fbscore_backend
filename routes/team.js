@@ -295,7 +295,7 @@ router.get("/search", async (req, res) => {
   }
 });
 
-//Route 5:Sending request to player.Signin required fot team owner.
+// Route 5: Sending request to player. Sign-in required for team owner.
 router.post(
   "/sendPlayerReq/:userId",
   [teamauth],
@@ -326,7 +326,7 @@ router.post(
         return res.status(400).json({ message: "User is already in a team!" });
       }
 
-      // Cheak if the requests already exist ?
+      // Check if the same team already sent a request to this player
       const existRequest = await PlayerRequest.findOne({ teamId, userId });
       if (existRequest)
         return res.status(400).json({ message: "Request already sent!" });
@@ -363,7 +363,6 @@ router.post(
 
       return res.status(200).json({ newReq });
     } catch (error) {
-      console.log(error);
       return res.status(500).json({ message: "Internal server error!" });
     }
   }

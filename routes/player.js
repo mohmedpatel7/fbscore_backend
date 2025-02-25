@@ -141,18 +141,25 @@ router.post("/userAction/:reqId", [userauth], async (req, res) => {
 //router 3:Fetching all users which are not in any team.Sign in reuired for team owner.
 router.get("/usersWithoutTeam", [teamauth], async (req, res) => {
   try {
-    // Get all player records and extract user IDs
-    const playerList = await Player.find({}, "userId");
+    const teamId = req.user.teamId; // Get the teamId from auth middleware
 
+    // Get all players who are already in a team
+    const playerList = await Player.find({}, "userId");
     const playerListIds = playerList.map((player) => player.userId.toString());
 
-    // If playerListIds is empty, fetch all users (since no users are assigned to a team)
+    // Get users who have pending requests from this specific team
+    const pendingRequests = await PlayerRequest.find({ teamId }, "userId");
+    const pendingRequestIds = pendingRequests.map((request) =>
+      request.userId.toString()
+    );
+
+    // Exclude users who are already in a team OR have a pending request from this team
     let query = {};
-    if (playerListIds.length > 0) {
-      query = { _id: { $nin: playerListIds } };
+    if (playerListIds.length > 0 || pendingRequestIds.length > 0) {
+      query = { _id: { $nin: [...playerListIds, ...pendingRequestIds] } };
     }
 
-    // Fetch all users who are NOT in the player list
+    // Fetch users who are NOT in a team and have NO pending request from this team
     const userList = await User.find(query).select("-password");
 
     if (userList.length === 0) {
