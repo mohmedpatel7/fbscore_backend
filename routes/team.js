@@ -435,13 +435,28 @@ router.get("/getPlayerDetails/:Pid", [teamauth], async (req, res) => {
   try {
     // Fetch the player details and populate associated team and user info
     const player = await Player.findById(Pid)
-      .populate("teamId", "teamname teamlogo country")
-      .populate("userId", "name pic country gender position foot dob");
+      .populate("teamId", "teamname teamlogo country email createdBy")
+      .populate("userId", "name pic country gender position foot dob email");
 
     // If player not found, respond with 404
     if (!player) {
       return res.status(404).json({ message: "Player details not found..!" });
     }
+
+    // Calculate age from dob
+    const calculateAge = (dob) => {
+      const birthDate = new Date(dob);
+      const today = new Date();
+      let age = today.getFullYear() - birthDate.getFullYear();
+      const monthDifference = today.getMonth() - birthDate.getMonth();
+      if (
+        monthDifference < 0 ||
+        (monthDifference === 0 && today.getDate() < birthDate.getDate())
+      ) {
+        age--;
+      }
+      return age;
+    };
 
     // Respond with player details
     return res.status(200).json({
@@ -452,12 +467,14 @@ router.get("/getPlayerDetails/:Pid", [teamauth], async (req, res) => {
         team: {
           teamId: player.teamId._id,
           teamname: player.teamId.teamname,
+          teamemail: player.teamId.email,
           teamlogo: player.teamId.teamlogo
             ? `${baseUrl}/uploads/other/${path.basename(
                 player.teamId.teamlogo
               )}`
             : null,
           country: player.teamId.country,
+          owner: player.teamId.createdBy,
         },
         user: {
           userId: player.userId._id,
@@ -469,7 +486,8 @@ router.get("/getPlayerDetails/:Pid", [teamauth], async (req, res) => {
           gender: player.userId.gender,
           position: player.userId.position,
           foot: player.userId.foot,
-          dob: player.userId.dob,
+          email: player.userId.email,
+          dob: calculateAge(player.userId.dob),
         },
       },
     });
