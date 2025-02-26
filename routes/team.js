@@ -316,6 +316,16 @@ router.post(
       const team = await Team.findById(teamId);
       if (!team) return res.status(404).json({ message: "Team not found!" });
 
+      // Count current number of players in the team
+      const playerCount = await Player.countDocuments({ teamId });
+
+      // Ensure team does not exceed 16 players
+      if (playerCount >= 16) {
+        return res
+          .status(400)
+          .json({ message: "Team already has the maximum of 16 players!" });
+      }
+
       // Finding user in db
       const user = await User.findById(userId);
       if (!user) return res.status(404).json({ message: "User not found!" });

@@ -67,7 +67,7 @@ router.post("/userAction/:reqId", [userauth], async (req, res) => {
       return res.status(403).json({ message: "You are not authorized!" });
     }
 
-    const team = requestExist.teamId; // Since populated, it already contains team data
+    const team = requestExist.teamId;
     if (!team) {
       return res.status(404).json({ message: "Team not found!" });
     }
@@ -104,7 +104,9 @@ router.post("/userAction/:reqId", [userauth], async (req, res) => {
       });
 
       await player.save();
-      await PlayerRequest.findByIdAndDelete(reqId);
+
+      // Delete ALL pending requests related to this user
+      await PlayerRequest.deleteMany({ userId: requestExist.userId._id });
 
       await transporter.sendMail({
         from: process.env.EMAIL,
@@ -160,7 +162,9 @@ router.get("/usersWithoutTeam", [teamauth], async (req, res) => {
     }
 
     // Fetch users who are NOT in a team and have NO pending request from this team
-    const userList = await User.find(query).select("-password");
+    const userList = await User.find(query)
+      .select("-password")
+      .sort({ createdAt: -1 });
 
     if (userList.length === 0) {
       return res
