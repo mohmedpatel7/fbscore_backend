@@ -8,7 +8,6 @@ const MatchOfficial = require("../schema_models/MatchOfficial");
 const ReqMatchOfficial = require("../schema_models/ReqMatchOfficial");
 const { body, validationResult } = require("express-validator");
 const matchofficialauth = require("../middleware/matchofficialauth");
-const userauth = require("../middleware/userauth");
 const crypto = require("crypto");
 const nodemailer = require("nodemailer");
 const bcrypt = require("bcryptjs");
@@ -380,124 +379,108 @@ router.get("/searchMatch", [matchofficialauth], async (req, res) => {
 });
 
 //Route 7:Updating match and player stats.Sign in required for match creator.
-router.put("/updateMatchStats", [matchofficialauth], async (req, res) => {
-  try {
-    const { matchId, scorerId, assistId, teamId } = req.body;
+router.put(
+  "/updateMatchStats/:matchId",
+  [matchofficialauth],
+  async (req, res) => {
+    try {
+      const { scorerId, assistId, teamId } = req.body;
+      const { matchId } = req.params;
 
-    // Validate required fields
-    if (!matchId || !scorerId || !teamId) {
-      return res.status(400).json({
-        message: "Match ID, scorer ID, and team ID are required!",
-      });
-    }
-
-    // Fetch the match to verify its existence
-    const match = await Match.findById(matchId);
-    if (!match) {
-      return res.status(404).json({ message: "Match not found!" });
-    }
-
-    // Validate match update by only the creator
-    if (match.createdBy.toString() !== req.user.id) {
-      return res.status(403).json({
-        message: "You are not authorized to update this match status.",
-      });
-    }
-
-    if (match.status !== "Live") {
-      return res.status(403).json({ message: "Match status must be 'Live'!" });
-    }
-
-    // Verify that the teamId belongs to one of the teams in the match
-    if (!match.teamA.equals(teamId) && !match.teamB.equals(teamId)) {
-      return res
-        .status(400)
-        .json({ message: "The team is not part of this match!" });
-    }
-
-    // Fetch players from the Player collection for both teams
-    const teamAPlayers = await Player.find({ teamId: match.teamA }).select(
-      "_id"
-    );
-    const teamBPlayers = await Player.find({ teamId: match.teamB }).select(
-      "_id"
-    );
-
-    // Combine players from both teams
-    const allPlayers = [
-      ...teamAPlayers.map((player) => player._id.toString()),
-      ...teamBPlayers.map((player) => player._id.toString()),
-    ];
-
-    // Validate scorerId and assistId
-    if (!allPlayers.includes(scorerId)) {
-      return res
-        .status(400)
-        .json({ message: "Scorer must be part of one of the teams!" });
-    }
-
-    if (assistId && !allPlayers.includes(assistId)) {
-      return res
-        .status(400)
-        .json({ message: "Assister must be part of one of the teams!" });
-    }
-
-    // Determine which team's score to update
-    const scoreField = match.teamA.equals(teamId)
-      ? "score.teamA"
-      : "score.teamB";
-
-    // Update the team score in the Match collection
-    await Match.findByIdAndUpdate(
-      matchId,
-      {
-        $inc: { [scoreField]: 1 }, // Increment the score of the appropriate team
-        $push: {
-          goals: {
-            scorer: scorerId, // Add goal info
-            assist: assistId || null, // Add assist info if provided
-            team: teamId,
-            timestamp: new Date(), // Record the time of the goal
-          },
-        },
-      },
-      { new: true }
-    );
-
-    // Update scorer's stats in PlayerStats collection
-    await PlayerStats.findOneAndUpdate(
-      { player_id: scorerId }, // Find the PlayerStats document for the scorer
-      {
-        $inc: {
-          totalgoals: 1, // Increment total goals for the scorer
-        },
-        $push: {
-          matches: {
-            match_id: matchId,
-            goals: 1, // Initialize goals in this match if it doesn't exist
-            assists: 0, // Initialize assists to 0 if no assists yet
-          },
-        },
-      },
-      {
-        upsert: true, // Create a PlayerStats record if it doesn't exist
-        new: true,
+      // Validate required fields
+      if (!matchId || !scorerId || !teamId) {
+        return res.status(400).json({
+          message: "Match ID, scorer ID, and team ID are required!",
+        });
       }
-    );
 
-    // Update assist stats if an assist ID is provided
-    if (assistId) {
+      // Fetch the match to verify its existence
+      const match = await Match.findById(matchId);
+      if (!match) {
+        return res.status(404).json({ message: "Match not found!" });
+      }
+
+      // Validate match update by only the creator
+      if (match.createdBy.toString() !== req.user.id) {
+        return res.status(403).json({
+          message: "You are not authorized to update this match status.",
+        });
+      }
+
+      if (match.status !== "Live") {
+        return res
+          .status(403)
+          .json({ message: "Match status must be 'Live'!" });
+      }
+
+      // Verify that the teamId belongs to one of the teams in the match
+      if (!match.teamA.equals(teamId) && !match.teamB.equals(teamId)) {
+        return res
+          .status(400)
+          .json({ message: "The team is not part of this match!" });
+      }
+
+      // Fetch players from the Player collection for both teams
+      const teamAPlayers = await Player.find({ teamId: match.teamA }).select(
+        "_id "
+      );
+
+      const teamBPlayers = await Player.find({ teamId: match.teamB }).select(
+        "_id"
+      );
+
+      // Combine players from both teams
+      const allPlayers = [
+        ...teamAPlayers.map((player) => player._id.toString()),
+        ...teamBPlayers.map((player) => player._id.toString()),
+      ];
+
+      if (!allPlayers.includes(scorerId)) {
+        return res
+          .status(400)
+          .json({ message: "Scorer must be part of one of the teams!" });
+      }
+
+      if (assistId && !allPlayers.includes(assistId)) {
+        return res
+          .status(400)
+          .json({ message: "Assister must be part of one of the teams!" });
+      }
+
+      // Determine which team's score to update
+      const scoreField = match.teamA.equals(teamId)
+        ? "score.teamA"
+        : "score.teamB";
+
+      // Update the team score in the Match collection
+      await Match.findByIdAndUpdate(
+        matchId,
+        {
+          $inc: { [scoreField]: 1 }, // Increment the score of the appropriate team
+          $push: {
+            goals: {
+              scorer: scorerId, // Add goal info
+              assist: assistId || null, // Add assist info if provided
+              team: teamId,
+              timestamp: new Date(), // Record the time of the goal
+            },
+          },
+        },
+        { new: true }
+      );
+
+      // Update scorer's stats in PlayerStats collection
       await PlayerStats.findOneAndUpdate(
-        { player_id: assistId }, // Find the PlayerStats document for the assist
+        { player_id: scorerId }, // Find the PlayerStats document for the scorer
         {
           $inc: {
-            totalassists: 1, // Increment total assists for the assister
+            totalgoals: 1, // Increment total goals for the scorer
           },
           $push: {
             matches: {
               match_id: matchId,
-              goals: 0, // Initialize goals to 0 if no goals yet
-              assists: 1, // Initialize assists to 1 in this match if it doesn't exist
+              goals: 1, // Initialize goals in this match if it doesn't exist
+              assists: 0, // Initialize assists to 0 if no assists yet
             },
           },
         },
@@ -506,17 +489,40 @@ router.put("/updateMatchStats", [matchofficialauth], async (req, res) => {
           new: true,
         }
       );
+
+      // Update assist stats if an assist ID is provided
+      if (assistId) {
+        await PlayerStats.findOneAndUpdate(
+          { player_id: assistId }, // Find the PlayerStats document for the assist
+          {
+            $inc: {
+              totalassists: 1, // Increment total assists for the assister
+            },
+            $push: {
+              matches: {
+                match_id: matchId,
+                goals: 0, // Initialize goals to 0 if no goals yet
+                assists: 1, // Initialize assists to 1 in this match if it doesn't exist
+              },
+            },
+          },
+          {
+            upsert: true, // Create a PlayerStats record if it doesn't exist
+            new: true,
+          }
+        );
+      }
+
+      return res
+        .status(200)
+        .json({ message: "Stats and match updated successfully." });
+    } catch (error) {
+      return res.status(500).json({ message: "Internal Server Error", error });
     }
-
-    return res
-      .status(200)
-      .json({ message: "Stats and match updated successfully." });
-  } catch (error) {
-    return res.status(500).json({ message: "Internal Server Error", error });
   }
-});
+);
 
-//Route 5:Fetching individual match details.Sign in required for user.
+// Route 5: Fetching individual match details. Sign-in required for users.
 router.get("/matchDetails/:matchId", [matchofficialauth], async (req, res) => {
   try {
     const { matchId } = req.params;
@@ -527,17 +533,11 @@ router.get("/matchDetails/:matchId", [matchofficialauth], async (req, res) => {
       .populate("createdBy", "name")
       .populate({
         path: "goals.scorer",
-        populate: {
-          path: "userId",
-          select: "name pic",
-        },
+        populate: { path: "userId", select: "name pic position" },
       })
       .populate({
         path: "goals.assist",
-        populate: {
-          path: "userId",
-          select: "name pic",
-        },
+        populate: { path: "userId", select: "name pic position" },
       })
       .populate("goals.team", "teamname teamlogo");
 
@@ -545,13 +545,13 @@ router.get("/matchDetails/:matchId", [matchofficialauth], async (req, res) => {
       return res.status(404).json({ message: "Match not found" });
     }
 
-    const teamAPlayers = await Player.find({
-      teamId: match.teamA._id,
-    }).populate("userId", "name pic position");
+    const teamAPlayers = await Player.find({ teamId: match.teamA._id })
+      .populate("userId", "name pic")
+      .select("position");
 
-    const teamBPlayers = await Player.find({
-      teamId: match.teamB._id,
-    }).populate("userId", "name pic position");
+    const teamBPlayers = await Player.find({ teamId: match.teamB._id })
+      .populate("userId", "name pic")
+      .select("position");
 
     // Restructure the response
     const response = {
@@ -569,11 +569,11 @@ router.get("/matchDetails/:matchId", [matchofficialauth], async (req, res) => {
             : null,
           players: teamAPlayers.map((player) => ({
             id: player._id,
-            name: player.userId.name,
-            pic: player.userId.pic
+            name: player.userId?.name || "Unknown",
+            pic: player.userId?.pic
               ? `${baseUrl}/uploads/other/${path.basename(player.userId.pic)}`
               : null,
-            position: player.userId.position,
+            position: player.position,
           })),
         },
         teamB: {
@@ -584,17 +584,17 @@ router.get("/matchDetails/:matchId", [matchofficialauth], async (req, res) => {
             : null,
           players: teamBPlayers.map((player) => ({
             id: player._id,
-            name: player.userId.name,
-            pic: player.userId.pic
+            name: player.userId?.name || "Unknown",
+            pic: player.userId?.pic
               ? `${baseUrl}/uploads/other/${path.basename(player.userId.pic)}`
               : null,
-            position: player.userId.position,
+            position: player.position,
           })),
         },
       },
       score: {
-        teamA: match.score.teamA,
-        teamB: match.score.teamB,
+        teamA: match.score?.teamA || 0,
+        teamB: match.score?.teamB || 0,
       },
       goals: match.goals.map((goal) => ({
         id: goal._id,
@@ -609,23 +609,25 @@ router.get("/matchDetails/:matchId", [matchofficialauth], async (req, res) => {
         scorer: goal.scorer
           ? {
               id: goal.scorer._id,
-              name: goal.scorer.userId.name,
-              pic: goal.scorer.userId.pic
+              name: goal.scorer.userId?.name || "Unknown",
+              pic: goal.scorer.userId?.pic
                 ? `${baseUrl}/uploads/other/${path.basename(
                     goal.scorer.userId.pic
                   )}`
                 : null,
+              position: goal.scorer.userId?.position || "Unknown",
             }
           : null,
         assist: goal.assist
           ? {
               id: goal.assist._id,
-              name: goal.assist.userId.name,
-              pic: goal.assist.userId.pic
+              name: goal.assist.userId?.name || "Unknown",
+              pic: goal.assist.userId?.pic
                 ? `${baseUrl}/uploads/other/${path.basename(
                     goal.assist.userId.pic
                   )}`
                 : null,
+              position: goal.assist.userId?.position || "Unknown",
             }
           : null,
       })),
@@ -644,7 +646,8 @@ router.get("/matches", async (req, res) => {
   try {
     const matches = await Match.find()
       .populate("teamA", "teamname teamlogo")
-      .populate("teamB", "teamname teamlogo");
+      .populate("teamB", "teamname teamlogo")
+      .sort({ match_date: 1 });
 
     if (matches.length === 0) {
       return res.status(404).json({ message: "No matches found" });
@@ -725,7 +728,6 @@ router.get("/createdMatches", [matchofficialauth], async (req, res) => {
 
     return res.status(200).json({ matches: response });
   } catch (error) {
-    console.error(error);
     return res.status(500).json({ message: "Internal Server Error", error });
   }
 });

@@ -9,6 +9,7 @@ const matchofficialauth = (req, res, next) => {
 
   // Check if no token
   if (!token) {
+    console.log("Authorization failed: No token provided");
     return res.status(401).json({ message: "No token, authorization denied" });
   }
 
@@ -16,15 +17,13 @@ const matchofficialauth = (req, res, next) => {
     // Verify token
     const decoded = jwt.verify(token, JWT_SIGN);
 
-    // Attach the user to the request object
-    req.user = { id: decoded.id }; // Updated to match decoded structure
+    // Extract the correct user ID from `isUser`
+    req.user = { id: decoded.isUser?.id };
 
     // Call the next middleware or route handler
     next();
   } catch (err) {
-    // Handle invalid token
-    console.error("Token verification failed:", err); // Debugging line
-    res.status(401).json({ message: "Token is not valid" });
+    return res.status(401).json({ message: "Token is not valid" });
   }
 };
 

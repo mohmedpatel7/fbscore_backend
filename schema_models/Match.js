@@ -47,7 +47,7 @@ const Match = new mongoose.Schema(
     },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "MatchOfficialSchema",
+      ref: "MatchOfficial",
       required: true,
     },
   },
