@@ -316,10 +316,30 @@ router.post(
       const team = await Team.findById(teamId);
       if (!team) return res.status(404).json({ message: "Team not found!" });
 
+      // Check if the team already has a player with the same jersey number
+      const existingPlayerWithNumber = await Player.findOne({
+        teamId,
+        playerNo,
+      });
+      if (existingPlayerWithNumber) {
+        return res.status(400).json({
+          message: `The jersey number ${playerNo} is already taken by another player in your team!`,
+        });
+      }
+
+      // Check if the same team already sent a request for this jersey number
+      const existingRequestWithNumber = await PlayerRequest.findOne({
+        teamId,
+        playerNo,
+      });
+      if (existingRequestWithNumber) {
+        return res.status(400).json({
+          message: `A request for ${playerNo} jersey number is already sent!`,
+        });
+      }
+
       // Count current number of players in the team
       const playerCount = await Player.countDocuments({ teamId });
-
-      // Ensure team does not exceed 16 players
       if (playerCount >= 16) {
         return res
           .status(400)
@@ -338,8 +358,9 @@ router.post(
 
       // Check if the same team already sent a request to this player
       const existRequest = await PlayerRequest.findOne({ teamId, userId });
-      if (existRequest)
+      if (existRequest) {
         return res.status(400).json({ message: "Request already sent!" });
+      }
 
       // Create a new player request
       const newReq = new PlayerRequest({
