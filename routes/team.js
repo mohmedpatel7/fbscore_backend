@@ -6,6 +6,7 @@ const Player = require("../schema_models/Players");
 const PlayerRequest = require("../schema_models/PlayerRequest");
 const User = require("../schema_models/User");
 const Match = require("../schema_models/Match");
+const PlayerStats = require("../schema_models/Stats");
 const { body, validationResult } = require("express-validator");
 const multer = require("multer");
 const crypto = require("crypto");
@@ -489,6 +490,16 @@ router.get("/getPlayerDetails/:Pid", [teamauth], async (req, res) => {
       return age;
     };
 
+    const playerStats = await PlayerStats.findOne({ player_id: player._id });
+    if (!playerStats)
+      return res.status(200).json({ message: "Player stats not found" });
+
+    // Extract match IDs and count unique ones
+    const uniqueMatchIds = new Set(
+      playerStats.matches.map((m) => m.match_id?.toString())
+    );
+    const totalMatches = uniqueMatchIds.size;
+
     // Respond with player details
     return res.status(200).json({
       message: "Details fetched successfully!",
@@ -520,6 +531,12 @@ router.get("/getPlayerDetails/:Pid", [teamauth], async (req, res) => {
           email: player.userId.email,
           dob: calculateAge(player.userId.dob),
         },
+
+        stats: {
+          totalgoals: playerStats.totalgoals,
+          totalassits: playerStats.totalassists,
+          totalmatches: totalMatches || null,
+        },
       },
     });
   } catch (error) {
@@ -538,17 +555,11 @@ router.get("/matchDetails/:matchId", [teamauth], async (req, res) => {
       .populate("createdBy", "name")
       .populate({
         path: "goals.scorer",
-        populate: {
-          path: "userId",
-          select: "name pic",
-        },
+        populate: { path: "userId", select: "name pic position" },
       })
       .populate({
         path: "goals.assist",
-        populate: {
-          path: "userId",
-          select: "name pic",
-        },
+        populate: { path: "userId", select: "name pic position" },
       })
       .populate("goals.team", "teamname teamlogo");
 
@@ -556,13 +567,13 @@ router.get("/matchDetails/:matchId", [teamauth], async (req, res) => {
       return res.status(404).json({ message: "Match not found" });
     }
 
-    const teamAPlayers = await Player.find({
-      teamId: match.teamA._id,
-    }).populate("userId", "name pic position");
+    const teamAPlayers = await Player.find({ teamId: match.teamA._id })
+      .populate("userId", "name pic")
+      .select("position");
 
-    const teamBPlayers = await Player.find({
-      teamId: match.teamB._id,
-    }).populate("userId", "name pic position");
+    const teamBPlayers = await Player.find({ teamId: match.teamB._id })
+      .populate("userId", "name pic")
+      .select("position");
 
     // Restructure the response
     const response = {
@@ -580,11 +591,11 @@ router.get("/matchDetails/:matchId", [teamauth], async (req, res) => {
             : null,
           players: teamAPlayers.map((player) => ({
             id: player._id,
-            name: player.userId.name,
-            pic: player.userId.pic
+            name: player.userId?.name || "Unknown",
+            pic: player.userId?.pic
               ? `${baseUrl}/uploads/other/${path.basename(player.userId.pic)}`
               : null,
-            position: player.userId.position,
+            position: player.position,
           })),
         },
         teamB: {
@@ -595,17 +606,17 @@ router.get("/matchDetails/:matchId", [teamauth], async (req, res) => {
             : null,
           players: teamBPlayers.map((player) => ({
             id: player._id,
-            name: player.userId.name,
-            pic: player.userId.pic
+            name: player.userId?.name || "Unknown",
+            pic: player.userId?.pic
               ? `${baseUrl}/uploads/other/${path.basename(player.userId.pic)}`
               : null,
-            position: player.userId.position,
+            position: player.position,
           })),
         },
       },
       score: {
-        teamA: match.score.teamA,
-        teamB: match.score.teamB,
+        teamA: match.score?.teamA || 0,
+        teamB: match.score?.teamB || 0,
       },
       goals: match.goals.map((goal) => ({
         id: goal._id,
@@ -620,23 +631,25 @@ router.get("/matchDetails/:matchId", [teamauth], async (req, res) => {
         scorer: goal.scorer
           ? {
               id: goal.scorer._id,
-              name: goal.scorer.userId.name,
-              pic: goal.scorer.userId.pic
+              name: goal.scorer.userId?.name || "Unknown",
+              pic: goal.scorer.userId?.pic
                 ? `${baseUrl}/uploads/other/${path.basename(
                     goal.scorer.userId.pic
                   )}`
                 : null,
+              position: goal.scorer.userId?.position || "Unknown",
             }
           : null,
         assist: goal.assist
           ? {
               id: goal.assist._id,
-              name: goal.assist.userId.name,
-              pic: goal.assist.userId.pic
+              name: goal.assist.userId?.name || "Unknown",
+              pic: goal.assist.userId?.pic
                 ? `${baseUrl}/uploads/other/${path.basename(
                     goal.assist.userId.pic
                   )}`
                 : null,
+              position: goal.assist.userId?.position || "Unknown",
             }
           : null,
       })),
@@ -658,7 +671,9 @@ router.get("/signinMatches", [teamauth], async (req, res) => {
     // Find matches where the team is participating
     const Matches = await Match.find({
       $or: [{ teamA: teamId }, { teamB: teamId }],
-    }).populate("teamA teamB", "teamname teamlogo");
+    })
+      .populate("teamA teamB", "teamname teamlogo")
+      .sort({ match_date: 1 });
 
     if (!Matches.length) {
       return res.status(404).json({ message: "No matches found!" });
@@ -671,14 +686,22 @@ router.get("/signinMatches", [teamauth], async (req, res) => {
         ? {
             id: match.teamA._id,
             teamname: match.teamA.teamname,
-            teamlogo: match.teamA.teamlogo,
+            teamlogo: match.teamA.teamlogo
+              ? `${baseUrl}/uploads/other/${path.basename(
+                  match.teamA.teamlogo
+                )}`
+              : null,
           }
         : null,
       teamB: match.teamB
         ? {
             id: match.teamB._id,
             teamname: match.teamB.teamname,
-            teamlogo: match.teamB.teamlogo,
+            teamlogo: match.teamB.teamlogo
+              ? `${baseUrl}/uploads/other/${path.basename(
+                  match.teamB.teamlogo
+                )}`
+              : null,
           }
         : null,
       score: match.score,
@@ -689,7 +712,6 @@ router.get("/signinMatches", [teamauth], async (req, res) => {
 
     return res.status(200).json({ matches: response });
   } catch (error) {
-    console.error(error);
     return res.status(500).json({ message: "Internal Server Error", error });
   }
 });
