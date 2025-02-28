@@ -465,18 +465,18 @@ router.get("/getPlayerDetails/:Pid", [teamauth], async (req, res) => {
   const { Pid } = req.params;
 
   try {
-    // Fetch the player details and populate associated team and user info
+    // Fetch player details with populated fields
     const player = await Player.findById(Pid)
       .populate("teamId", "teamname teamlogo country email createdBy")
       .populate("userId", "name pic country gender position foot dob email");
 
-    // If player not found, respond with 404
     if (!player) {
       return res.status(404).json({ message: "Player details not found..!" });
     }
 
-    // Calculate age from dob
+    // Function to calculate age from dob
     const calculateAge = (dob) => {
+      if (!dob) return null;
       const birthDate = new Date(dob);
       const today = new Date();
       let age = today.getFullYear() - birthDate.getFullYear();
@@ -490,15 +490,21 @@ router.get("/getPlayerDetails/:Pid", [teamauth], async (req, res) => {
       return age;
     };
 
+    // Fetch player statistics
     const playerStats = await PlayerStats.findOne({ player_id: player._id });
-    if (!playerStats)
+    if (!playerStats) {
       return res.status(200).json({ message: "Player stats not found" });
+    }
 
-    // Extract match IDs and count unique ones
-    const uniqueMatchIds = new Set(
-      playerStats.matches.map((m) => m.match_id?.toString())
-    );
-    const totalMatches = uniqueMatchIds.size;
+    // Fetch total matches played by the team when the status is "Full Time"
+    const totalMatches = await Match.countDocuments({
+      $and: [
+        {
+          $or: [{ teamA: player.teamId._id }, { teamB: player.teamId._id }],
+        },
+        { status: "Full Time" },
+      ],
+    });
 
     // Respond with player details
     return res.status(200).json({
@@ -531,19 +537,18 @@ router.get("/getPlayerDetails/:Pid", [teamauth], async (req, res) => {
           email: player.userId.email,
           dob: calculateAge(player.userId.dob),
         },
-
         stats: {
-          totalgoals: playerStats.totalgoals,
-          totalassits: playerStats.totalassists,
-          totalmatches: totalMatches || null,
+          totalgoals: playerStats.totalgoals || 0,
+          totalassits: playerStats.totalassists || 0,
+          totalmatches: totalMatches || 0, // Ensure it returns 0 instead of null
         },
       },
     });
   } catch (error) {
+    console.error("Error fetching player details:", error);
     return res.status(500).json({ message: "Internal server error..!" });
   }
 });
-
 //Route 8:Fetching individual match details.Sign in required for user.
 router.get("/matchDetails/:matchId", [teamauth], async (req, res) => {
   try {
