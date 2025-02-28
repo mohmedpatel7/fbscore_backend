@@ -545,7 +545,6 @@ router.get("/getPlayerDetails/:Pid", [teamauth], async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Error fetching player details:", error);
     return res.status(500).json({ message: "Internal server error..!" });
   }
 });
@@ -572,13 +571,13 @@ router.get("/matchDetails/:matchId", [teamauth], async (req, res) => {
       return res.status(404).json({ message: "Match not found" });
     }
 
-    const teamAPlayers = await Player.find({ teamId: match.teamA._id })
-      .populate("userId", "name pic")
-      .select("position");
+    const teamAPlayers = await Player.find({
+      teamId: match.teamA._id,
+    }).populate("userId", "name pic position");
 
-    const teamBPlayers = await Player.find({ teamId: match.teamB._id })
-      .populate("userId", "name pic")
-      .select("position");
+    const teamBPlayers = await Player.find({
+      teamId: match.teamB._id,
+    }).populate("userId", "name pic position");
 
     // Restructure the response
     const response = {
@@ -596,6 +595,7 @@ router.get("/matchDetails/:matchId", [teamauth], async (req, res) => {
             : null,
           players: teamAPlayers.map((player) => ({
             id: player._id,
+            jeresyNo: player.playerNo,
             name: player.userId?.name || "Unknown",
             pic: player.userId?.pic
               ? `${baseUrl}/uploads/other/${path.basename(player.userId.pic)}`
@@ -611,6 +611,7 @@ router.get("/matchDetails/:matchId", [teamauth], async (req, res) => {
             : null,
           players: teamBPlayers.map((player) => ({
             id: player._id,
+            jeresyNo: player.playerNo,
             name: player.userId?.name || "Unknown",
             pic: player.userId?.pic
               ? `${baseUrl}/uploads/other/${path.basename(player.userId.pic)}`
