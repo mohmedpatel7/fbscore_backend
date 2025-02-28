@@ -668,12 +668,26 @@ router.get("/signinMatches", [teamauth], async (req, res) => {
   try {
     const teamId = req.user.teamId;
 
-    // Find matches where the team is participating
-    const Matches = await Match.find({
+    // Fetch 7 "Full Time" matches for the signed-in team
+    const fullTimeMatches = await Match.find({
       $or: [{ teamA: teamId }, { teamB: teamId }],
+      status: "Full Time",
     })
       .populate("teamA teamB", "teamname teamlogo")
-      .sort({ match_date: 1 });
+      .sort({ match_date: 1 })
+      .limit(7);
+
+    // Fetch 10 matches with other statuses for the signed-in team
+    const otherMatches = await Match.find({
+      $or: [{ teamA: teamId }, { teamB: teamId }],
+      status: { $ne: "Full Time" },
+    })
+      .populate("teamA teamB", "teamname teamlogo")
+      .sort({ match_date: 1 })
+      .limit(10);
+
+    // Merge both results
+    const Matches = [...fullTimeMatches, ...otherMatches];
 
     if (!Matches.length) {
       return res.status(404).json({ message: "No matches found!" });
@@ -704,7 +718,7 @@ router.get("/signinMatches", [teamauth], async (req, res) => {
               : null,
           }
         : null,
-      score: match.score,
+      score: match.score || { teamA: 0, teamB: 0 }, // Default score if missing
       date: match.match_date,
       time: match.match_time,
       status: match.status,
