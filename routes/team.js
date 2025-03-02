@@ -217,6 +217,7 @@ router.get("/getTeamDetails", [teamauth], async (req, res) => {
         country: team.country,
         createdBy: team.createdBy,
         email: team.email,
+        createdAt: team.createdAt,
       },
       players: player.map((player) => ({
         playerId: player._id,
@@ -744,6 +745,54 @@ router.get("/signinMatches", [teamauth], async (req, res) => {
     return res.status(200).json({ matches: response });
   } catch (error) {
     return res.status(500).json({ message: "Internal Server Error", error });
+  }
+});
+
+// Route 10: Fetching other team details.
+router.get("/getTeamDetails/:teamid", [teamauth], async (req, res) => {
+  const { teamid } = req.params;
+
+  try {
+    const team = await Team.findById(teamid);
+    if (!team) {
+      return res.status(404).json({ message: "Team not found..!" });
+    }
+
+    const player = await Player.find({ teamId: teamid }).populate("userId");
+
+    return res.status(200).json({
+      message: "Team details fetched.",
+      team: {
+        teamname: team.teamname,
+        teamlogo: team.teamlogo
+          ? `${baseUrl}/uploads/other/${path.basename(team.teamlogo)}`
+          : null,
+        country: team.country,
+        createdBy: team.createdBy,
+        email: team.email,
+        createdAt: team.createdAt,
+      },
+      players: player.map((player) => ({
+        playerId: player._id,
+        playerNo: player.playerNo,
+
+        users: {
+          userId: player.userId._id,
+          name: player.userId.name,
+          pic: player.userId.pic
+            ? `${baseUrl}/uploads/other/${path.basename(player.userId.pic)}`
+            : null,
+          email: player.userId.email,
+          country: player.userId.country,
+          gender: player.userId.gender,
+          dob: player.userId.dob,
+          position: player.userId.position,
+          foot: player.userId.foot,
+        },
+      })),
+    });
+  } catch (error) {
+    return res.status(500).json({ message: "Internel server errror...!" });
   }
 });
 
