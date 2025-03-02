@@ -539,7 +539,11 @@ router.get("/matchDetails/:matchId", [matchofficialauth], async (req, res) => {
         path: "goals.assist",
         populate: { path: "userId", select: "name pic position" },
       })
-      .populate("goals.team", "teamname teamlogo");
+      .populate("goals.team", "teamname teamlogo")
+      .populate({
+        path: "mvp",
+        populate: { path: "userId", select: "name pic position" },
+      });
 
     if (!match) {
       return res.status(404).json({ message: "Match not found" });
@@ -560,6 +564,13 @@ router.get("/matchDetails/:matchId", [matchofficialauth], async (req, res) => {
       matchTime: match.match_time,
       status: match.status,
       createdBy: match.createdBy.name,
+      mvp: {
+        name: match.mvp?.userId?.name,
+        pic: match.mvp?.userId?.pic,
+        position: match.mvp?.userId?.position
+          ? `${baseUrl}/uploads/other/${path.basename(match.mvp?.userId?.pic)}`
+          : null,
+      },
       teams: {
         teamA: {
           id: match.teamA._id,
@@ -579,7 +590,6 @@ router.get("/matchDetails/:matchId", [matchofficialauth], async (req, res) => {
         },
         teamB: {
           id: match.teamB._id,
-          jeresyNo: player.playerNo,
           name: match.teamB.teamname,
           logo: match.teamB.teamlogo
             ? `${baseUrl}/uploads/other/${path.basename(match.teamB.teamlogo)}`
@@ -587,6 +597,7 @@ router.get("/matchDetails/:matchId", [matchofficialauth], async (req, res) => {
           players: teamBPlayers.map((player) => ({
             id: player._id,
             name: player.userId?.name || "Unknown",
+            jeresyNo: player.playerNo,
             pic: player.userId?.pic
               ? `${baseUrl}/uploads/other/${path.basename(player.userId.pic)}`
               : null,
@@ -639,6 +650,7 @@ router.get("/matchDetails/:matchId", [matchofficialauth], async (req, res) => {
       .status(200)
       .json({ message: "Data fetched successfully", data: response });
   } catch (error) {
+    console.log(error);
     return res.status(500).json({ message: "Internal Server Error", error });
   }
 });
@@ -731,6 +743,50 @@ router.get("/createdMatches", [matchofficialauth], async (req, res) => {
     return res.status(200).json({ matches: response });
   } catch (error) {
     return res.status(500).json({ message: "Internal Server Error", error });
+  }
+});
+
+// route 8: Assign MVP after Full Time
+router.put("/assignMVP/:matchId", [matchofficialauth], async (req, res) => {
+  try {
+    const { matchId } = req.params;
+    const { playerId } = req.body;
+
+    // Check if the match exists
+    const match = await Match.findById(matchId);
+    if (!match) {
+      return res.status(404).json({ message: "Match not found" });
+    }
+
+    // Ensure match status is Full Time before assigning MVP
+    if (match.status !== "Full Time") {
+      return res
+        .status(400)
+        .json({ message: "MVP can only be assigned after Full Time" });
+    }
+
+    // Validate match update by only the creator
+    if (match.createdBy.toString() !== req.user.id) {
+      return res.status(403).json({
+        message: "You are not authorized to update this match status.",
+      });
+    }
+
+    // Check if the player exists
+    const player = await Player.findById(playerId);
+    if (!player) {
+      return res.status(404).json({ message: "Player not found" });
+    }
+
+    // Assign MVP
+    match.mvp = playerId;
+    await match.save();
+
+    return res
+      .status(200)
+      .json({ message: "MVP assigned successfully", match });
+  } catch (error) {
+    return res.status(500).json({ message: "Internal Server Error" });
   }
 });
 

@@ -45,6 +45,11 @@ const Match = new mongoose.Schema(
       enum: ["Upcoming", "Live", "Half Time", "Full Time", "Delayed"], // Predefined statuses
       default: "Upcoming", // Default value
     },
+    mvp: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Player",
+      default: "Unknown",
+    },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "MatchOfficial",
