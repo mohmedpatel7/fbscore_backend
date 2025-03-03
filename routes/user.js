@@ -4,6 +4,7 @@ const User = require("../schema_models/User");
 const Team = require("../schema_models/Team");
 const Player = require("../schema_models/Players");
 const Match = require("../schema_models/Match");
+const PlayerStats = require("../schema_models/Stats");
 const bcrypt = require("bcryptjs");
 const { body, validationResult } = require("express-validator");
 const jwt = require("jsonwebtoken");
@@ -236,6 +237,9 @@ router.get("/getuser", [userauth], async (req, res) => {
     //If user is part of any team.
     const isPlayer = await Player.findOne({ userId: user }).populate("teamId");
 
+    // Fetch user statistics
+    const playerStats = await PlayerStats.findOne({ player_id: isPlayer._id });
+
     const response = {
       id: userdetails._id,
       name: userdetails.name,
@@ -266,6 +270,16 @@ router.get("/getuser", [userauth], async (req, res) => {
             teamemail: isPlayer.teamId.email,
           }
         : null,
+
+      stats: playerStats
+        ? {
+            totalgoals: playerStats.totalgoals,
+            totalassist: playerStats.totalassists,
+          }
+        : {
+            totalgoals: 0,
+            totalassist: 0,
+          },
     };
 
     return res.status(200).json({ response });

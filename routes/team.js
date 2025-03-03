@@ -493,9 +493,6 @@ router.get("/getPlayerDetails/:Pid", [teamauth], async (req, res) => {
 
     // Fetch player statistics
     const playerStats = await PlayerStats.findOne({ player_id: player._id });
-    if (!playerStats) {
-      return res.status(200).json({ message: "Player stats not found" });
-    }
 
     // Fetch total matches played by the team when the status is "Full Time"
     const totalMatches = await Match.countDocuments({
@@ -538,11 +535,18 @@ router.get("/getPlayerDetails/:Pid", [teamauth], async (req, res) => {
           email: player.userId.email,
           dob: calculateAge(player.userId.dob),
         },
-        stats: {
-          totalgoals: playerStats.totalgoals || 0,
-          totalassits: playerStats.totalassists || 0,
-          totalmatches: totalMatches || 0, // Ensure it returns 0 instead of null
-        },
+
+        stats: playerStats
+          ? {
+              totalgoals: playerStats.totalgoals || 0,
+              totalassits: playerStats.totalassists || 0,
+              totalmatches: totalMatches || 0, // Ensure it returns 0 instead of null
+            }
+          : {
+              totalgoals: 0,
+              totalassits: 0,
+              totalmatches: 0,
+            },
       },
     });
   } catch (error) {
