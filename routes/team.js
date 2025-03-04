@@ -466,7 +466,7 @@ router.get("/getPlayerDetails/:Pid", [teamauth], async (req, res) => {
   const { Pid } = req.params;
 
   try {
-    // Fetch player details with populated fields
+    // Fetch the player details and get userId
     const player = await Player.findById(Pid)
       .populate("teamId", "teamname teamlogo country email createdBy")
       .populate("userId", "name pic country gender position foot dob email");
@@ -475,9 +475,10 @@ router.get("/getPlayerDetails/:Pid", [teamauth], async (req, res) => {
       return res.status(404).json({ message: "Player details not found..!" });
     }
 
-    // Function to calculate age from dob
+    const userId = player.userId._id;
+
+    // Calculate age from dob
     const calculateAge = (dob) => {
-      if (!dob) return null;
       const birthDate = new Date(dob);
       const today = new Date();
       let age = today.getFullYear() - birthDate.getFullYear();
@@ -491,20 +492,32 @@ router.get("/getPlayerDetails/:Pid", [teamauth], async (req, res) => {
       return age;
     };
 
-    // Fetch player statistics
-    const playerStats = await PlayerStats.findOne({ player_id: player._id });
+    // Fetch all player stats for the user across all teams
+    const allPlayerStats = await PlayerStats.find({ user_id: userId });
 
-    // Fetch total matches played by the team when the status is "Full Time"
+    // Calculate total goals and assists across all teams
+    const totalGoals = allPlayerStats.reduce(
+      (sum, stat) => sum + (stat.totalgoals || 0),
+      0
+    );
+    const totalAssists = allPlayerStats.reduce(
+      (sum, stat) => sum + (stat.totalassists || 0),
+      0
+    );
+
+    // Fetch total matches played for **current** team only
     const totalMatches = await Match.countDocuments({
       $and: [
-        {
-          $or: [{ teamA: player.teamId._id }, { teamB: player.teamId._id }],
-        },
+        { $or: [{ teamA: player.teamId._id }, { teamB: player.teamId._id }] },
         { status: "Full Time" },
       ],
     });
 
-    // Respond with player details
+    // Fetch stats for only the current player (NOT all teams)
+    const currentPlayerStats = await PlayerStats.findOne({
+      player_id: player._id,
+    });
+
     return res.status(200).json({
       message: "Details fetched successfully!",
       player: {
@@ -533,26 +546,25 @@ router.get("/getPlayerDetails/:Pid", [teamauth], async (req, res) => {
           position: player.userId.position,
           foot: player.userId.foot,
           email: player.userId.email,
-          dob: calculateAge(player.userId.dob),
+          dob: player.userId.dob,
+          age: calculateAge(player.userId.dob),
         },
-
-        stats: playerStats
-          ? {
-              totalgoals: playerStats.totalgoals || 0,
-              totalassits: playerStats.totalassists || 0,
-              totalmatches: totalMatches || 0, // Ensure it returns 0 instead of null
-            }
-          : {
-              totalgoals: 0,
-              totalassits: 0,
-              totalmatches: 0,
-            },
+        stats: {
+          totalgoals: totalGoals, // Total from ALL teams
+          totalassits: totalAssists, // Total from ALL teams
+          currentgoals: currentPlayerStats ? currentPlayerStats.totalgoals : 0, // Current team's goals
+          currentassists: currentPlayerStats
+            ? currentPlayerStats.totalassists
+            : 0, // Current team's assists
+          totalmatches: totalMatches || 0, // Only for the current team
+        },
       },
     });
   } catch (error) {
     return res.status(500).json({ message: "Internal server error..!" });
   }
 });
+
 //Route 8:Fetching individual match details.Sign in required for user.
 router.get("/matchDetails/:matchId", [teamauth], async (req, res) => {
   try {
@@ -571,10 +583,7 @@ router.get("/matchDetails/:matchId", [teamauth], async (req, res) => {
         populate: { path: "userId", select: "name pic position" },
       })
       .populate("goals.team", "teamname teamlogo")
-      .populate({
-        path: "mvp",
-        populate: { path: "userId", select: "name pic position" },
-      });
+      .populate("mvp", "name pic position");
 
     if (!match) {
       return res.status(404).json({ message: "Match not found" });
@@ -595,13 +604,17 @@ router.get("/matchDetails/:matchId", [teamauth], async (req, res) => {
       matchTime: match.match_time,
       status: match.status,
       createdBy: match.createdBy.name,
-      mvp: {
-        name: match.mvp?.userId?.name,
-        pic: match.mvp?.userId?.pic
-          ? `${baseUrl}/uploads/other/${path.basename(match.mvp?.userId?.pic)}`
-          : null,
-        position: match.mvp?.userId?.position,
-      },
+      mvp: match.mvp
+        ? {
+            id: match.mvp._id,
+            name: match.mvp.name,
+            pic: match.mvp.pic
+              ? `${baseUrl}/uploads/other/${path.basename(match.mvp.pic)}`
+              : null,
+            position: match.mvp.position || "Unknown",
+          }
+        : null,
+
       teams: {
         teamA: {
           id: match.teamA._id,

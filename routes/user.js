@@ -232,15 +232,36 @@ router.get("/getuser", [userauth], async (req, res) => {
       return age;
     };
 
-    const age = userdetails.dob ? calculateAge(userdetails.dob) : null;
-
     // Check if the user is part of any team
     const isPlayer = await Player.findOne({ userId: user }).populate("teamId");
 
-    // Fetch user statistics only if isPlayer is found
-    const playerStats = isPlayer
-      ? await PlayerStats.findOne({ player_id: isPlayer._id })
-      : null;
+    // Fetch all player stats for the user across all teams
+    const allPlayerStats = await PlayerStats.find({ user_id: user });
+
+    // Calculate total goals and assists across all teams
+    const totalGoals = allPlayerStats.reduce(
+      (sum, stat) => sum + (stat.totalgoals || 0),
+      0
+    );
+    const totalAssists = allPlayerStats.reduce(
+      (sum, stat) => sum + (stat.totalassists || 0),
+      0
+    );
+
+    // Fetch total matches played for **current** team only
+    const totalMatches = await Match.countDocuments({
+      $and: [
+        {
+          $or: [{ teamA: isPlayer.teamId._id }, { teamB: isPlayer.teamId._id }],
+        },
+        { status: "Full Time" },
+      ],
+    });
+
+    // Fetch stats for only the current player (NOT all teams)
+    const currentPlayerStats = await PlayerStats.findOne({
+      player_id: isPlayer._id,
+    });
 
     const response = {
       id: userdetails._id,
@@ -249,7 +270,7 @@ router.get("/getuser", [userauth], async (req, res) => {
         ? `${baseUrl}/uploads/other/${path.basename(userdetails.pic)}`
         : null,
       email: userdetails.email,
-      age: age,
+      age: calculateAge(userdetails.dob),
       gender: userdetails.gender,
       country: userdetails.country,
       position: userdetails.position,
@@ -259,8 +280,8 @@ router.get("/getuser", [userauth], async (req, res) => {
 
       playerDetails: isPlayer
         ? {
-            playerId: isPlayer.playerId || null,
-            teamname: isPlayer.teamname || "Unknown Team",
+            playerId: isPlayer._id,
+            teamname: isPlayer.teamId?.teamname || "Unknown Team",
             teamlogo: isPlayer.teamId?.teamlogo
               ? `${baseUrl}/uploads/other/${path.basename(
                   isPlayer.teamId.teamlogo
@@ -273,20 +294,19 @@ router.get("/getuser", [userauth], async (req, res) => {
           }
         : null,
 
-      stats: playerStats
-        ? {
-            totalgoals: playerStats.totalgoals || 0,
-            totalassist: playerStats.totalassists || 0,
-          }
-        : {
-            totalgoals: 0,
-            totalassist: 0,
-          },
+      stats: {
+        totalgoals: totalGoals,
+        totalassits: totalAssists,
+        currentgoals: currentPlayerStats ? currentPlayerStats.totalgoals : 0, // Current team's goals
+        currentassists: currentPlayerStats
+          ? currentPlayerStats.totalassists
+          : 0, // Current team's assists
+        totalmatches: totalMatches || 0, // Only for the current team
+      },
     };
 
     return res.status(200).json({ response });
   } catch (error) {
-    console.error("Error in /getuser route:", error); // Log the error
     return res.status(500).json({ message: "Internal server error" });
   }
 });

@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const Team = require("../schema_models/Team");
 const Player = require("../schema_models/Players");
+const User = require("../schema_models/User");
 const Match = require("../schema_models/Match");
 const PlayerStats = require("../schema_models/Stats");
 const MatchOfficial = require("../schema_models/MatchOfficial");
@@ -259,9 +260,10 @@ router.post("/createMatch", [matchofficialauth], async (req, res) => {
         PlayerStats.findOneAndUpdate(
           { player_id: player._id },
           {
+            user_id: player.userId, // Add user_id for reference
             $push: {
               matches: {
-                match_Id: newMatch._id,
+                match_id: newMatch._id, // Fixed typo (was `match_Id`)
                 goals: 0,
                 assists: 0,
               },
@@ -422,37 +424,44 @@ router.put(
 
       // Fetch players from the Player collection for both teams
       const teamAPlayers = await Player.find({ teamId: match.teamA }).select(
-        "_id "
+        "_id userId"
       );
 
       const teamBPlayers = await Player.find({ teamId: match.teamB }).select(
-        "_id"
+        "_id userId"
       );
 
       // Combine players from both teams
-      const allPlayers = [
-        ...teamAPlayers.map((player) => player._id.toString()),
-        ...teamBPlayers.map((player) => player._id.toString()),
-      ];
+      const allPlayers = [...teamAPlayers, ...teamBPlayers];
+      const allPlayerIds = allPlayers.map((player) => player._id.toString());
 
-      if (!allPlayers.includes(scorerId)) {
+      if (!allPlayerIds.includes(scorerId)) {
         return res
           .status(400)
           .json({ message: "Scorer must be part of one of the teams!" });
       }
 
-      if (assistId && !allPlayers.includes(assistId)) {
+      if (assistId && !allPlayerIds.includes(assistId)) {
         return res
           .status(400)
           .json({ message: "Assister must be part of one of the teams!" });
       }
+
+      // Find `userId` for scorer and assist
+      const scorer = allPlayers.find(
+        (player) => player._id.toString() === scorerId
+      );
+
+      const assistPlayer = assistId
+        ? allPlayers.find((player) => player._id.toString() === assistId)
+        : null;
 
       // Determine which team's score to update
       const scoreField = match.teamA.equals(teamId)
         ? "score.teamA"
         : "score.teamB";
 
-      // Update the team score in the Match collection
+      // 1️⃣ **Update the Match collection (increment score and push goal details)**
       await Match.findByIdAndUpdate(
         matchId,
         {
@@ -469,47 +478,39 @@ router.put(
         { new: true }
       );
 
-      // Update scorer's stats in PlayerStats collection
+      // 2️⃣ **Update Scorer Stats**
       await PlayerStats.findOneAndUpdate(
-        { player_id: scorerId }, // Find the PlayerStats document for the scorer
+        { player_id: scorerId, user_id: scorer?.userId }, // Use `userId`
         {
-          $inc: {
-            totalgoals: 1, // Increment total goals for the scorer
-          },
+          $inc: { totalgoals: 1 },
           $push: {
             matches: {
               match_id: matchId,
-              goals: 1, // Initialize goals in this match if it doesn't exist
-              assists: 0, // Initialize assists to 0 if no assists yet
+              goals: 1,
+              assists: 0,
             },
+            user_ids: scorer?.userId, // Use `userId`
           },
         },
-        {
-          upsert: true, // Create a PlayerStats record if it doesn't exist
-          new: true,
-        }
+        { upsert: true, new: true }
       );
 
-      // Update assist stats if an assist ID is provided
-      if (assistId) {
+      // 3️⃣ **Update Assist Stats (if assist exists)**
+      if (assistId && assistPlayer) {
         await PlayerStats.findOneAndUpdate(
-          { player_id: assistId }, // Find the PlayerStats document for the assist
+          { player_id: assistId, user_id: assistPlayer?.userId }, // Use `userId`
           {
-            $inc: {
-              totalassists: 1, // Increment total assists for the assister
-            },
+            $inc: { totalassists: 1 },
             $push: {
               matches: {
                 match_id: matchId,
-                goals: 0, // Initialize goals to 0 if no goals yet
-                assists: 1, // Initialize assists to 1 in this match if it doesn't exist
+                goals: 0,
+                assists: 1,
               },
+              user_ids: assistPlayer?.userId, // Use `userId`
             },
           },
-          {
-            upsert: true, // Create a PlayerStats record if it doesn't exist
-            new: true,
-          }
+          { upsert: true, new: true }
         );
       }
 
@@ -540,37 +541,37 @@ router.get("/matchDetails/:matchId", [matchofficialauth], async (req, res) => {
         populate: { path: "userId", select: "name pic position" },
       })
       .populate("goals.team", "teamname teamlogo")
-      .populate({
-        path: "mvp",
-        populate: { path: "userId", select: "name pic position" },
-      });
+      .populate("mvp", "name pic position");
 
     if (!match) {
       return res.status(404).json({ message: "Match not found" });
     }
 
     const teamAPlayers = await Player.find({ teamId: match.teamA._id })
-      .populate("userId", "name pic")
-      .select("position");
+      .populate("userId", "name pic position")
+      .select("playerNo");
 
     const teamBPlayers = await Player.find({ teamId: match.teamB._id })
-      .populate("userId", "name pic")
-      .select("position");
+      .populate("userId", "name pic position")
+      .select("playerNo");
 
-    // Restructure the response
     const response = {
       matchId: match._id,
       matchDate: match.match_date,
       matchTime: match.match_time,
       status: match.status,
       createdBy: match.createdBy.name,
-      mvp: {
-        name: match.mvp?.userId?.name,
-        pic: match.mvp?.userId?.pic,
-        position: match.mvp?.userId?.position
-          ? `${baseUrl}/uploads/other/${path.basename(match.mvp?.userId?.pic)}`
-          : null,
-      },
+      mvp: match.mvp
+        ? {
+            id: match.mvp._id,
+            name: match.mvp.name,
+            pic: match.mvp.pic
+              ? `${baseUrl}/uploads/other/${path.basename(match.mvp.pic)}`
+              : null,
+            position: match.mvp.position || "Unknown",
+          }
+        : null,
+
       teams: {
         teamA: {
           id: match.teamA._id,
@@ -585,7 +586,7 @@ router.get("/matchDetails/:matchId", [matchofficialauth], async (req, res) => {
             pic: player.userId?.pic
               ? `${baseUrl}/uploads/other/${path.basename(player.userId.pic)}`
               : null,
-            position: player.position,
+            position: player.userId?.position || "Unknown",
           })),
         },
         teamB: {
@@ -596,12 +597,12 @@ router.get("/matchDetails/:matchId", [matchofficialauth], async (req, res) => {
             : null,
           players: teamBPlayers.map((player) => ({
             id: player._id,
-            name: player.userId?.name || "Unknown",
             jeresyNo: player.playerNo,
+            name: player.userId?.name || "Unknown",
             pic: player.userId?.pic
               ? `${baseUrl}/uploads/other/${path.basename(player.userId.pic)}`
               : null,
-            position: player.position,
+            position: player.userId?.position || "Unknown",
           })),
         },
       },
@@ -619,28 +620,28 @@ router.get("/matchDetails/:matchId", [matchofficialauth], async (req, res) => {
             ? `${baseUrl}/uploads/other/${path.basename(goal.team.teamlogo)}`
             : null,
         },
-        scorer: goal.scorer
+        scorer: goal.scorer?.userId
           ? {
-              id: goal.scorer._id,
-              name: goal.scorer.userId?.name || "Unknown",
-              pic: goal.scorer.userId?.pic
+              id: goal.scorer.userId._id,
+              name: goal.scorer.userId.name || "Unknown",
+              pic: goal.scorer.userId.pic
                 ? `${baseUrl}/uploads/other/${path.basename(
                     goal.scorer.userId.pic
                   )}`
                 : null,
-              position: goal.scorer.userId?.position || "Unknown",
+              position: goal.scorer.userId.position || "Unknown",
             }
           : null,
-        assist: goal.assist
+        assist: goal.assist?.userId
           ? {
-              id: goal.assist._id,
-              name: goal.assist.userId?.name || "Unknown",
-              pic: goal.assist.userId?.pic
+              id: goal.assist.userId._id,
+              name: goal.assist.userId.name || "Unknown",
+              pic: goal.assist.userId.pic
                 ? `${baseUrl}/uploads/other/${path.basename(
                     goal.assist.userId.pic
                   )}`
                 : null,
-              position: goal.assist.userId?.position || "Unknown",
+              position: goal.assist.userId.position || "Unknown",
             }
           : null,
       })),
@@ -650,7 +651,6 @@ router.get("/matchDetails/:matchId", [matchofficialauth], async (req, res) => {
       .status(200)
       .json({ message: "Data fetched successfully", data: response });
   } catch (error) {
-    console.log(error);
     return res.status(500).json({ message: "Internal Server Error", error });
   }
 });
@@ -750,7 +750,7 @@ router.get("/createdMatches", [matchofficialauth], async (req, res) => {
 router.put("/assignMVP/:matchId", [matchofficialauth], async (req, res) => {
   try {
     const { matchId } = req.params;
-    const { playerId } = req.body;
+    const { userId } = req.body;
 
     // Check if the match exists
     const match = await Match.findById(matchId);
@@ -773,13 +773,13 @@ router.put("/assignMVP/:matchId", [matchofficialauth], async (req, res) => {
     }
 
     // Check if the player exists
-    const player = await Player.findById(playerId);
+    const player = await User.findById(userId);
     if (!player) {
       return res.status(404).json({ message: "Player not found" });
     }
 
     // Assign MVP
-    match.mvp = playerId;
+    match.mvp = userId;
     await match.save();
 
     return res

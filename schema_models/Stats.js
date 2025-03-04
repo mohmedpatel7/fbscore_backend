@@ -2,13 +2,19 @@ const mongoose = require("mongoose");
 
 const PlayerStats = new mongoose.Schema(
   {
-    //player identification...
+    // Player identification...
     player_id: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Player",
       required: true,
     },
-    //Perticular match details..
+    user_id: {
+      // New field to reference the User
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+    // Particular match details...
     matches: [
       {
         match_id: {
@@ -26,7 +32,7 @@ const PlayerStats = new mongoose.Schema(
         },
       },
     ],
-    //General stats
+    // General stats
     totalgoals: {
       type: Number,
       default: 0,

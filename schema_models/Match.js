@@ -47,8 +47,7 @@ const Match = new mongoose.Schema(
     },
     mvp: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Player",
-      default: "Unknown",
+      ref: "User",
     },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
