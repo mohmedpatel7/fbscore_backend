@@ -234,11 +234,13 @@ router.get("/getuser", [userauth], async (req, res) => {
 
     const age = userdetails.dob ? calculateAge(userdetails.dob) : null;
 
-    //If user is part of any team.
+    // Check if the user is part of any team
     const isPlayer = await Player.findOne({ userId: user }).populate("teamId");
 
-    // Fetch user statistics
-    const playerStats = await PlayerStats.findOne({ player_id: isPlayer._id });
+    // Fetch user statistics only if isPlayer is found
+    const playerStats = isPlayer
+      ? await PlayerStats.findOne({ player_id: isPlayer._id })
+      : null;
 
     const response = {
       id: userdetails._id,
@@ -257,24 +259,24 @@ router.get("/getuser", [userauth], async (req, res) => {
 
       playerDetails: isPlayer
         ? {
-            playerId: isPlayer.playerId,
-            teamname: isPlayer.teamname,
-            teamlogo: isPlayer.teamId.teamlogo
+            playerId: isPlayer.playerId || null,
+            teamname: isPlayer.teamname || "Unknown Team",
+            teamlogo: isPlayer.teamId?.teamlogo
               ? `${baseUrl}/uploads/other/${path.basename(
                   isPlayer.teamId.teamlogo
                 )}`
               : null,
-            jeresyNo: isPlayer.playerNo,
-            teamcountry: isPlayer.teamId.country,
-            teamowner: isPlayer.teamId.createdBy,
-            teamemail: isPlayer.teamId.email,
+            jeresyNo: isPlayer.playerNo || "N/A",
+            teamcountry: isPlayer.teamId?.country || "N/A",
+            teamowner: isPlayer.teamId?.createdBy || "N/A",
+            teamemail: isPlayer.teamId?.email || "N/A",
           }
         : null,
 
       stats: playerStats
         ? {
-            totalgoals: playerStats.totalgoals,
-            totalassist: playerStats.totalassists,
+            totalgoals: playerStats.totalgoals || 0,
+            totalassist: playerStats.totalassists || 0,
           }
         : {
             totalgoals: 0,
@@ -284,6 +286,7 @@ router.get("/getuser", [userauth], async (req, res) => {
 
     return res.status(200).json({ response });
   } catch (error) {
+    console.error("Error in /getuser route:", error); // Log the error
     return res.status(500).json({ message: "Internal server error" });
   }
 });

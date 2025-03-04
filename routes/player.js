@@ -26,7 +26,7 @@ router.get("/getTeamReq", userauth, async (req, res) => {
     if (!isUser) return res.status(404).json({ message: "User not found!" });
 
     // Fetch requests
-    const requests = await PlayerRequest.find({ userId });
+    const requests = await PlayerRequest.find({ userId }).populate("teamId");
 
     // If no requests found
     if (requests.length === 0) {
@@ -36,6 +36,9 @@ router.get("/getTeamReq", userauth, async (req, res) => {
     const response = {
       requests: requests.map((req) => ({
         reqId: req._id,
+        teamlogo: req.teamId.teamlogo
+          ? `${baseUrl}/uploads/other/${path.basename(req.teamId.teamlogo)}`
+          : null,
         teamname: req.teamname,
         JeresyNo: req.playerNo,
         date: req.createdAt,
