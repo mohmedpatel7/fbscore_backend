@@ -303,6 +303,7 @@ router.get("/getuser", [userauth], async (req, res) => {
         : null,
       email: userdetails.email,
       age: calculateAge(userdetails.dob),
+      dob: userdetails.dob,
       gender: userdetails.gender,
       country: userdetails.country,
       position: userdetails.position,
