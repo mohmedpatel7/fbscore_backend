@@ -204,6 +204,7 @@ router.post(
 );
 
 //Route 4: Get all user details..
+// Route 4: Get all user details including teammates
 router.get("/getuser", [userauth], async (req, res) => {
   try {
     if (!req.user || !req.user.id) {
@@ -217,7 +218,7 @@ router.get("/getuser", [userauth], async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    // Calculate age from dob
+    // Function to calculate age from date of birth (dob)
     const calculateAge = (dob) => {
       const birthDate = new Date(dob);
       const today = new Date();
@@ -232,13 +233,11 @@ router.get("/getuser", [userauth], async (req, res) => {
       return age;
     };
 
-    // Check if the user is part of any team
+    // Check if the user is a player and fetch their team details
     const isPlayer = await Player.findOne({ userId: user }).populate("teamId");
 
     // Fetch all player stats for the user across all teams
     const allPlayerStats = await PlayerStats.find({ user_id: user });
-
-    // Calculate total goals and assists across all teams
     const totalGoals = allPlayerStats.reduce(
       (sum, stat) => sum + (stat.totalgoals || 0),
       0
@@ -248,24 +247,38 @@ router.get("/getuser", [userauth], async (req, res) => {
       0
     );
 
-    // Fetch total matches played for **current** team only
+    // Fetch total matches played for the current team only
     const totalMatches = await Match.countDocuments({
       $and: [
         {
-          $or: [{ teamA: isPlayer.teamId._id }, { teamB: isPlayer.teamId._id }],
+          $or: [
+            { teamA: isPlayer?.teamId?._id },
+            { teamB: isPlayer?.teamId?._id },
+          ],
         },
         { status: "Full Time" },
       ],
     });
 
-    // Fetch stats for only the current player (NOT all teams)
+    // Fetch current player stats for the current team
     const currentPlayerStats = await PlayerStats.findOne({
-      player_id: isPlayer._id,
+      player_id: isPlayer?._id,
     });
 
-    // **Fetch Matches for Player's Team**
+    // Fetch teammates (excluding the signed-in user)
+    let teammates = [];
+    if (isPlayer?.teamId) {
+      teammates = await Player.find({
+        teamId: isPlayer.teamId._id,
+        userId: { $ne: user },
+      })
+        .populate("userId", "name pic email gender country position foot")
+        .select("playerNo"); // Selecting jersey number
+    }
+
+    // Fetch Matches for the Player's Team
     const fullTimeMatches = await Match.find({
-      $or: [{ teamA: isPlayer.teamId._id }, { teamB: isPlayer.teamId._id }],
+      $or: [{ teamA: isPlayer?.teamId?._id }, { teamB: isPlayer?.teamId?._id }],
       status: "Full Time",
     })
       .populate("teamA teamB", "teamname teamlogo")
@@ -273,16 +286,16 @@ router.get("/getuser", [userauth], async (req, res) => {
       .limit(7);
 
     const otherMatches = await Match.find({
-      $or: [{ teamA: isPlayer.teamId._id }, { teamB: isPlayer.teamId._id }],
+      $or: [{ teamA: isPlayer?.teamId?._id }, { teamB: isPlayer?.teamId?._id }],
       status: { $ne: "Full Time" },
     })
       .populate("teamA teamB", "teamname teamlogo")
       .sort({ match_date: 1 })
       .limit(10);
 
-    // Merge both results
     const teamMatches = [...fullTimeMatches, ...otherMatches];
 
+    // Construct response
     const response = {
       id: userdetails._id,
       name: userdetails.name,
@@ -307,7 +320,7 @@ router.get("/getuser", [userauth], async (req, res) => {
                   isPlayer.teamId.teamlogo
                 )}`
               : null,
-            jeresyNo: isPlayer.playerNo || "N/A",
+            jerseyNo: isPlayer.playerNo || "N/A",
             teamcountry: isPlayer.teamId?.country || "N/A",
             teamowner: isPlayer.teamId?.createdBy || "N/A",
             teamemail: isPlayer.teamId?.email || "N/A",
@@ -316,13 +329,28 @@ router.get("/getuser", [userauth], async (req, res) => {
 
       stats: {
         totalgoals: totalGoals,
-        totalassits: totalAssists,
+        totalassists: totalAssists,
         currentgoals: currentPlayerStats ? currentPlayerStats.totalgoals : 0,
         currentassists: currentPlayerStats
           ? currentPlayerStats.totalassists
           : 0,
         totalmatches: totalMatches || 0,
       },
+
+      teammates: teammates.map((player) => ({
+        playerId: player._id || "N/A",
+        userId: player.userId._id || "N/A",
+        name: player.userId.name || "N/A",
+        pic: player.userId.pic
+          ? `${baseUrl}/uploads/other/${path.basename(player.userId.pic)}`
+          : null,
+        email: player.userId.email || "N/A",
+        gender: player.userId.gender || "N/A",
+        country: player.userId.country || "N/A",
+        position: player.userId.position || "N/A",
+        foot: player.userId.foot || "N/A",
+        jeresyNo: player.playerNo || "N/A",
+      })),
 
       matches: teamMatches.map((match) => ({
         matchId: match._id,
@@ -348,7 +376,7 @@ router.get("/getuser", [userauth], async (req, res) => {
                 : null,
             }
           : null,
-        score: match.score || { teamA: 0, teamB: 0 }, // Default score if missing
+        score: match.score || { teamA: 0, teamB: 0 },
         date: match.match_date,
         time: match.match_time,
         status: match.status,
