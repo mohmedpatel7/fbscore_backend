@@ -263,6 +263,26 @@ router.get("/getuser", [userauth], async (req, res) => {
       player_id: isPlayer._id,
     });
 
+    // **Fetch Matches for Player's Team**
+    const fullTimeMatches = await Match.find({
+      $or: [{ teamA: isPlayer.teamId._id }, { teamB: isPlayer.teamId._id }],
+      status: "Full Time",
+    })
+      .populate("teamA teamB", "teamname teamlogo")
+      .sort({ match_date: 1 })
+      .limit(7);
+
+    const otherMatches = await Match.find({
+      $or: [{ teamA: isPlayer.teamId._id }, { teamB: isPlayer.teamId._id }],
+      status: { $ne: "Full Time" },
+    })
+      .populate("teamA teamB", "teamname teamlogo")
+      .sort({ match_date: 1 })
+      .limit(10);
+
+    // Merge both results
+    const teamMatches = [...fullTimeMatches, ...otherMatches];
+
     const response = {
       id: userdetails._id,
       name: userdetails.name,
@@ -297,17 +317,47 @@ router.get("/getuser", [userauth], async (req, res) => {
       stats: {
         totalgoals: totalGoals,
         totalassits: totalAssists,
-        currentgoals: currentPlayerStats ? currentPlayerStats.totalgoals : 0, // Current team's goals
+        currentgoals: currentPlayerStats ? currentPlayerStats.totalgoals : 0,
         currentassists: currentPlayerStats
           ? currentPlayerStats.totalassists
-          : 0, // Current team's assists
-        totalmatches: totalMatches || 0, // Only for the current team
+          : 0,
+        totalmatches: totalMatches || 0,
       },
+
+      matches: teamMatches.map((match) => ({
+        matchId: match._id,
+        teamA: match.teamA
+          ? {
+              id: match.teamA._id,
+              teamname: match.teamA.teamname,
+              teamlogo: match.teamA.teamlogo
+                ? `${baseUrl}/uploads/other/${path.basename(
+                    match.teamA.teamlogo
+                  )}`
+                : null,
+            }
+          : null,
+        teamB: match.teamB
+          ? {
+              id: match.teamB._id,
+              teamname: match.teamB.teamname,
+              teamlogo: match.teamB.teamlogo
+                ? `${baseUrl}/uploads/other/${path.basename(
+                    match.teamB.teamlogo
+                  )}`
+                : null,
+            }
+          : null,
+        score: match.score || { teamA: 0, teamB: 0 }, // Default score if missing
+        date: match.match_date,
+        time: match.match_time,
+        status: match.status,
+      })),
     };
 
     return res.status(200).json({ response });
   } catch (error) {
-    return res.status(500).json({ message: "Internal server error" });
+    return res.status(500).json({ message: "Internal server error", error });
   }
 });
 
@@ -356,9 +406,9 @@ router.put(
         return res.status(400).json({ message: "User not found..!" });
       }
 
-      res.status(200).json({ message: "Password updated successfully" });
+      return res.status(200).json({ message: "Password updated successfully" });
     } catch (error) {
-      res.status(500).json({ message: "Internal server error" });
+      return res.status(500).json({ message: "Internal server error" });
     }
   }
 );
@@ -463,17 +513,18 @@ router.get("/matchDetails/:matchId", [userauth], async (req, res) => {
         path: "goals.scorer",
         populate: {
           path: "userId",
-          select: "name pic",
+          select: "name pic position",
         },
       })
       .populate({
         path: "goals.assist",
         populate: {
           path: "userId",
-          select: "name pic",
+          select: "name pic position",
         },
       })
-      .populate("goals.team", "teamname teamlogo");
+      .populate("goals.team", "teamname teamlogo")
+      .populate("mvp", "name pic position");
 
     if (!match) {
       return res.status(404).json({ message: "Match not found" });
@@ -494,6 +545,16 @@ router.get("/matchDetails/:matchId", [userauth], async (req, res) => {
       matchTime: match.match_time,
       status: match.status,
       createdBy: match.createdBy.name,
+      mvp: match.mvp
+        ? {
+            id: match.mvp._id,
+            name: match.mvp.name,
+            pic: match.mvp.pic
+              ? `${baseUrl}/uploads/other/${path.basename(match.mvp.pic)}`
+              : null,
+            position: match.mvp.position || "Unknown",
+          }
+        : null,
       teams: {
         teamA: {
           id: match.teamA._id,
@@ -549,6 +610,7 @@ router.get("/matchDetails/:matchId", [userauth], async (req, res) => {
                     goal.scorer.userId.pic
                   )}`
                 : null,
+              position: goal.scorer?.userId?.position,
             }
           : null,
         assist: goal.assist
@@ -560,6 +622,7 @@ router.get("/matchDetails/:matchId", [userauth], async (req, res) => {
                     goal.assist.userId.pic
                   )}`
                 : null,
+              position: goal.assist?.userId?.position,
             }
           : null,
       })),
@@ -570,6 +633,54 @@ router.get("/matchDetails/:matchId", [userauth], async (req, res) => {
       .json({ message: "Data fetched successfully", data: response });
   } catch (error) {
     return res.status(500).json({ message: "Internal Server Error", error });
+  }
+});
+
+// Route 9: Fetching other team details.
+router.get("/getTeamDetails/:teamid", [userauth], async (req, res) => {
+  const { teamid } = req.params;
+
+  try {
+    const team = await Team.findById(teamid);
+    if (!team) {
+      return res.status(404).json({ message: "Team not found..!" });
+    }
+
+    const player = await Player.find({ teamId: teamid }).populate("userId");
+
+    return res.status(200).json({
+      message: "Team details fetched.",
+      team: {
+        teamname: team.teamname,
+        teamlogo: team.teamlogo
+          ? `${baseUrl}/uploads/other/${path.basename(team.teamlogo)}`
+          : null,
+        country: team.country,
+        createdBy: team.createdBy,
+        email: team.email,
+        createdAt: team.createdAt,
+      },
+      players: player.map((player) => ({
+        playerId: player._id,
+        playerNo: player.playerNo,
+
+        users: {
+          userId: player.userId._id,
+          name: player.userId.name,
+          pic: player.userId.pic
+            ? `${baseUrl}/uploads/other/${path.basename(player.userId.pic)}`
+            : null,
+          email: player.userId.email,
+          country: player.userId.country,
+          gender: player.userId.gender,
+          dob: player.userId.dob,
+          position: player.userId.position,
+          foot: player.userId.foot,
+        },
+      })),
+    });
+  } catch (error) {
+    return res.status(500).json({ message: "Internel server errror...!" });
   }
 });
 
