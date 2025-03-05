@@ -203,7 +203,6 @@ router.post(
   }
 );
 
-//Route 4: Get all user details..
 // Route 4: Get all user details including teammates
 router.get("/getuser", [userauth], async (req, res) => {
   try {
@@ -320,7 +319,7 @@ router.get("/getuser", [userauth], async (req, res) => {
                   isPlayer.teamId.teamlogo
                 )}`
               : null,
-            jerseyNo: isPlayer.playerNo || "N/A",
+            jeresyNo: isPlayer.playerNo || "N/A",
             teamcountry: isPlayer.teamId?.country || "N/A",
             teamowner: isPlayer.teamId?.createdBy || "N/A",
             teamemail: isPlayer.teamId?.email || "N/A",
@@ -709,6 +708,110 @@ router.get("/getTeamDetails/:teamid", [userauth], async (req, res) => {
     });
   } catch (error) {
     return res.status(500).json({ message: "Internel server errror...!" });
+  }
+});
+
+// Route 10:Get other player profile.
+router.get("/getPlayerDetails/:Pid", [userauth], async (req, res) => {
+  const { Pid } = req.params;
+
+  try {
+    // Fetch the player details and get userId
+    const player = await Player.findById(Pid)
+      .populate("teamId", "teamname teamlogo country email createdBy")
+      .populate("userId", "name pic country gender position foot dob email");
+
+    if (!player) {
+      return res.status(404).json({ message: "Player details not found..!" });
+    }
+
+    const userId = player.userId._id;
+
+    // Calculate age from dob
+    const calculateAge = (dob) => {
+      const birthDate = new Date(dob);
+      const today = new Date();
+      let age = today.getFullYear() - birthDate.getFullYear();
+      const monthDifference = today.getMonth() - birthDate.getMonth();
+      if (
+        monthDifference < 0 ||
+        (monthDifference === 0 && today.getDate() < birthDate.getDate())
+      ) {
+        age--;
+      }
+      return age;
+    };
+
+    // Fetch all player stats for the user across all teams
+    const allPlayerStats = await PlayerStats.find({ user_id: userId });
+
+    // Calculate total goals and assists across all teams
+    const totalGoals = allPlayerStats.reduce(
+      (sum, stat) => sum + (stat.totalgoals || 0),
+      0
+    );
+    const totalAssists = allPlayerStats.reduce(
+      (sum, stat) => sum + (stat.totalassists || 0),
+      0
+    );
+
+    // Fetch total matches played for **current** team only
+    const totalMatches = await Match.countDocuments({
+      $and: [
+        { $or: [{ teamA: player.teamId._id }, { teamB: player.teamId._id }] },
+        { status: "Full Time" },
+      ],
+    });
+
+    // Fetch stats for only the current player (NOT all teams)
+    const currentPlayerStats = await PlayerStats.findOne({
+      player_id: player._id,
+    });
+
+    return res.status(200).json({
+      message: "Details fetched successfully!",
+      player: {
+        playerId: player._id,
+        playerNo: player.playerNo,
+        team: {
+          teamId: player.teamId._id,
+          teamname: player.teamId.teamname,
+          teamemail: player.teamId.email,
+          teamlogo: player.teamId.teamlogo
+            ? `${baseUrl}/uploads/other/${path.basename(
+                player.teamId.teamlogo
+              )}`
+            : null,
+          country: player.teamId.country,
+          owner: player.teamId.createdBy,
+        },
+        user: {
+          userId: player.userId._id,
+          name: player.userId.name,
+          pic: player.userId.pic
+            ? `${baseUrl}/uploads/other/${path.basename(player.userId.pic)}`
+            : null,
+          country: player.userId.country,
+          gender: player.userId.gender,
+          position: player.userId.position,
+          foot: player.userId.foot,
+          email: player.userId.email,
+          dob: player.userId.dob,
+          age: calculateAge(player.userId.dob),
+        },
+        stats: {
+          totalgoals: totalGoals, // Total from ALL teams
+          totalassits: totalAssists, // Total from ALL teams
+          currentgoals: currentPlayerStats ? currentPlayerStats.totalgoals : 0, // Current team's goals
+          currentassists: currentPlayerStats
+            ? currentPlayerStats.totalassists
+            : 0, // Current team's assists
+          totalmatches: totalMatches || 0, // Only for the current team
+        },
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({ message: "Internal server error..!" });
   }
 });
 
