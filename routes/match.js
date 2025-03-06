@@ -658,42 +658,53 @@ router.get("/matchDetails/:matchId", [matchofficialauth], async (req, res) => {
 //Route 6:Fetching all matches.Sign in not required.
 router.get("/matches", async (req, res) => {
   try {
-    const matches = await Match.find()
-      .populate("teamA", "teamname teamlogo")
-      .populate("teamB", "teamname teamlogo")
-      .sort({ match_date: 1 });
+    // Fetch 7 "Full Time" matches
+    const fullTimeMatches = await Match.find({ status: "Full Time" })
+      .populate("teamA teamB", "teamname teamlogo")
+      .sort({ match_date: 1 })
+      .limit(7);
 
-    if (matches.length === 0) {
-      return res.status(404).json({ message: "No matches found" });
+    // Fetch 10 matches with other statuses
+    const otherMatches = await Match.find({ status: { $ne: "Full Time" } })
+      .populate("teamA teamB", "teamname teamlogo")
+      .sort({ match_date: 1 })
+      .limit(10);
+
+    // Merge both results
+    const matches = [...fullTimeMatches, ...otherMatches];
+
+    if (!matches.length) {
+      return res.status(404).json({ message: "No matches found!" });
     }
 
-    const response = {
-      matches: matches.map((match) => ({
-        matchId: match._id,
-        teamA: {
-          id: match.teamA._id,
-          name: match.teamA.teamname,
-          logo: match.teamA.teamlogo
-            ? `${baseUrl}/uploads/other/${path.basename(match.teamA.teamlogo)}`
-            : null,
-        },
-        teamB: {
-          id: match.teamB._id,
-          name: match.teamB.teamname,
-          logo: match.teamB.teamlogo
-            ? `${baseUrl}/uploads/other/${path.basename(match.teamB.teamlogo)}`
-            : null,
-        },
-        status: match.status,
-        score: match.score,
-        matchTime: match.match_time,
-        matchDate: match.match_date,
-      })),
-    };
+    // Format the response
+    const response = matches.map((match) => ({
+      matchId: match._id,
+      teamA: match.teamA
+        ? {
+            id: match.teamA._id,
+            name: match.teamA.teamname,
+            logo: match.teamA.teamlogo
+              ? `${baseUrl}/uploads/other/${path.basename(match.teamA.teamlogo)}`
+              : null,
+          }
+        : null,
+      teamB: match.teamB
+        ? {
+            id: match.teamB._id,
+            name: match.teamB.teamname,
+            logo: match.teamB.teamlogo
+              ? `${baseUrl}/uploads/other/${path.basename(match.teamB.teamlogo)}`
+              : null,
+          }
+        : null,
+      status: match.status,
+      score: match.score || { teamA: 0, teamB: 0 }, // Default score if missing
+      matchDate: match.match_date,
+      matchTime: match.match_time,
+    }));
 
-    return res
-      .status(200)
-      .json({ message: "Matches fetched successfully", data: response });
+    return res.status(200).json({ message: "Matches fetched successfully", matches: response });
   } catch (error) {
     return res.status(500).json({ message: "Internal Server Error", error });
   }
