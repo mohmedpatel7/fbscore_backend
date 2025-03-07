@@ -985,4 +985,56 @@ router.put("/assignMVP/:matchId", [matchofficialauth], async (req, res) => {
   }
 });
 
+// Route 9:forgot password.
+router.put(
+  "/forgotpassword",
+  [
+    body("email").isEmail().withMessage("Invalid email..!"),
+    body("otp").isNumeric().withMessage("Otp is required..!"),
+    body("newPassword")
+      .isString()
+      .isLength({ min: 5, max: 16 })
+      .withMessage("Password must be 5-16 characters..!"),
+  ],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { email, otp, newPassword } = req.body;
+
+    // OTP Verification
+    if (
+      !setOtp[email] ||
+      setOtp[email].otp !== otp ||
+      Date.now() > setOtp[email].expiry
+    ) {
+      return res.status(400).json({ message: "Invalid or expired OTP" });
+    }
+
+    delete setOtp[email]; // OTP is used, delete it
+
+    try {
+      //hashing new password...
+      const salt = await bcrypt.genSalt(10);
+      const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+      //update user password
+      const user = await MatchOfficial.findOneAndUpdate(
+        { email: email },
+        { password: hashedPassword },
+        { new: true }
+      );
+      if (!user) {
+        return res.status(400).json({ message: "User not found..!" });
+      }
+
+      return res.status(200).json({ message: "Password updated successfully" });
+    } catch (error) {
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  }
+);
+
 module.exports = router;

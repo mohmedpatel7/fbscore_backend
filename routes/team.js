@@ -865,4 +865,41 @@ router.put(
   }
 );
 
+//Route 12:Updating user detials.sign in required for user...
+router.put("/updateTeamDetails", [teamauth], async (req, res) => {
+  try {
+    const teamId = req.user.teamId;
+    const { teamlogo, country, createdBy } = req.body;
+
+    // Build the update object dynamically
+    const updatedFields = {};
+
+    if (teamlogo !== undefined) updatedFields.teamlogo = teamlogo;
+    if (country !== undefined) updatedFields.country = country;
+    if (createdBy !== undefined) updatedFields.createdBy = createdBy;
+
+    // Check if there are any fields to update
+    if (Object.keys(updatedFields).length === 0) {
+      return res.status(400).json({ message: "No fields provided to update." });
+    }
+
+    // Find user and update details
+    const user = await Team.findByIdAndUpdate(teamId, updatedFields, {
+      new: true, // Return the updated document
+      runValidators: true, // Apply schema validation
+    }).select("-password");
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found." });
+    }
+
+    return res.status(200).json({
+      message: "User details updated successfully.",
+      user,
+    });
+  } catch (error) {
+    return res.status(500).json({ message: "Internal server error." });
+  }
+});
+
 module.exports = router;
