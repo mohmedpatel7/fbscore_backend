@@ -1037,4 +1037,26 @@ router.put(
   }
 );
 
+// Route 10:Get team names list.sigin required for match official.
+router.get("/getTeamNames", [matchofficialauth], async (req, res) => {
+  try {
+    const data = await Team.find().select("teamname teamlogo _id");
+    if (!data) return res.status(404).json({ message: "Not found!" });
+
+    const response = {
+      data: data.map((teams) => ({
+        teamId: teams._id,
+        teamname: teams.teamname,
+        teamlogo: teams.teamlogo
+          ? `${baseUrl}/uploads/other/${path.basename(teams.teamlogo)}`
+          : null,
+      })),
+    };
+
+    return res.status(200).json({ message: "Data fetched", response });
+  } catch (error) {
+    return res.status(500).json({ message: "Internal server error" });
+  }
+});
+
 module.exports = router;
