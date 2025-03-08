@@ -197,6 +197,13 @@ router.post("/createMatch", [matchofficialauth], async (req, res) => {
       return res.status(400).json({ message: "All fields are required!" });
     }
 
+    // Team ID Validation: `teamA` and `teamB` should not be the same
+    if (teamA === teamB) {
+      return res
+        .status(400)
+        .json({ message: "TeamA and TeamB cannot be the same!" });
+    }
+
     // Validate `match_date`
     const parsedDate = new Date(match_date);
     if (isNaN(parsedDate)) {
@@ -1059,4 +1066,70 @@ router.get("/getTeamNames", [matchofficialauth], async (req, res) => {
   }
 });
 
+// Route 11: Fetching signin match official created matches.
+router.get("/signinMatches", [matchofficialauth], async (req, res) => {
+  try {
+    const matchOfficialId = req.user.id;
+
+    // Fetch 7 "Full Time" matches for the signed-in team
+    const fullTimeMatches = await Match.find({
+      createdBy: matchOfficialId,
+      status: "Full Time",
+    })
+      .populate("teamA teamB", "teamname teamlogo")
+      .sort({ match_date: 1 })
+      .limit(7);
+
+    // Fetch 10 matches with other statuses for the signed-in team
+    const otherMatches = await Match.find({
+      createdBy: matchOfficialId,
+      status: { $ne: "Full Time" },
+    })
+      .populate("teamA teamB", "teamname teamlogo")
+      .sort({ match_date: 1 })
+      .limit(10);
+
+    // Merge both results
+    const Matches = [...fullTimeMatches, ...otherMatches];
+
+    if (!Matches.length) {
+      return res.status(404).json({ message: "No matches found!" });
+    }
+
+    // Format the response
+    const response = Matches.map((match) => ({
+      matchId: match._id,
+      teamA: match.teamA
+        ? {
+            id: match.teamA._id,
+            teamname: match.teamA.teamname,
+            teamlogo: match.teamA.teamlogo
+              ? `${baseUrl}/uploads/other/${path.basename(
+                  match.teamA.teamlogo
+                )}`
+              : null,
+          }
+        : null,
+      teamB: match.teamB
+        ? {
+            id: match.teamB._id,
+            teamname: match.teamB.teamname,
+            teamlogo: match.teamB.teamlogo
+              ? `${baseUrl}/uploads/other/${path.basename(
+                  match.teamB.teamlogo
+                )}`
+              : null,
+          }
+        : null,
+      score: match.score || { teamA: 0, teamB: 0 }, // Default score if missing
+      date: match.match_date,
+      time: match.match_time,
+      status: match.status,
+    }));
+
+    return res.status(200).json({ matches: response });
+  } catch (error) {
+    return res.status(500).json({ message: "Internal Server Error", error });
+  }
+});
 module.exports = router;
