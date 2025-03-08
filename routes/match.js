@@ -298,6 +298,7 @@ router.put("/updateStatus/:matchId", [matchofficialauth], async (req, res) => {
       "Half Time",
       "Full Time",
       "Delayed",
+      "Cancel",
     ];
 
     // Validate input

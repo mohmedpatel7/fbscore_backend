@@ -42,7 +42,7 @@ const Match = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["Upcoming", "Live", "Half Time", "Full Time", "Delayed"], // Predefined statuses
+      enum: ["Upcoming", "Live", "Half Time", "Full Time", "Delayed", "Cancel"], // Predefined statuses
       default: "Upcoming", // Default value
     },
     mvp: {
