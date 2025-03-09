@@ -404,6 +404,12 @@ router.put(
         });
       }
 
+      // Validate id's
+      if (scorerId === assistId)
+        return res
+          .status(400)
+          .json({ message: "Scorer and assister could not be equal!" });
+
       // Fetch the match to verify its existence
       const match = await Match.findById(matchId);
       if (!match) {
