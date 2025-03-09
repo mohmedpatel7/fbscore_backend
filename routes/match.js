@@ -959,7 +959,7 @@ router.get("/createdMatches", [matchofficialauth], async (req, res) => {
 router.put("/assignMVP/:matchId", [matchofficialauth], async (req, res) => {
   try {
     const { matchId } = req.params;
-    const { userId } = req.body;
+    const { playerId } = req.body;
 
     // Check if the match exists
     const match = await Match.findById(matchId);
@@ -982,13 +982,13 @@ router.put("/assignMVP/:matchId", [matchofficialauth], async (req, res) => {
     }
 
     // Check if the player exists
-    const player = await User.findById(userId);
+    const player = await Player.findById({ _id: playerId });
     if (!player) {
       return res.status(404).json({ message: "Player not found" });
     }
 
     // Assign MVP
-    match.mvp = userId;
+    match.mvp = playerId;
     await match.save();
 
     return res

@@ -592,6 +592,7 @@ router.get("/matchDetails/:matchId", [userauth], async (req, res) => {
             : null,
           players: teamAPlayers.map((player) => ({
             id: player._id,
+            jeresyNo: player.playerNo,
             name: player.userId.name,
             pic: player.userId.pic
               ? `${baseUrl}/uploads/other/${path.basename(player.userId.pic)}`
@@ -606,6 +607,7 @@ router.get("/matchDetails/:matchId", [userauth], async (req, res) => {
             ? `${baseUrl}/uploads/other/${path.basename(match.teamB.teamlogo)}`
             : null,
           players: teamBPlayers.map((player) => ({
+            jeresyNo: player.playerNo,
             id: player._id,
             name: player.userId.name,
             pic: player.userId.pic
