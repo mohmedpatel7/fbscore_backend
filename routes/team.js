@@ -246,27 +246,45 @@ router.get("/getTeamDetails", [teamauth], async (req, res) => {
 //Route 4:Searching team and user details.Login required..
 router.get("/search", async (req, res) => {
   const { searchquery } = req.query; // Get the search term from query params
-  try {
-    if (!searchquery)
-      return res.status(400).json({ message: "Search term is required..!" });
 
+  if (!searchquery) {
+    return res.status(400).json({ message: "Search term is required." });
+  }
+
+  try {
     // Regex for case-insensitive partial match
     const searchRegex = new RegExp(searchquery, "i");
 
-    //finding search result for teams..
+    // Finding search results for teams
     const teams_result = await Team.find(
       { teamname: { $regex: searchRegex } },
-      "teamname teamlogo country createdBy"
+      "teamname teamlogo country createdBy _id"
     );
 
-    //finding search result for users..
+    // Finding search results for users
     const user_result = await User.find(
       { name: { $regex: searchRegex } },
-      "name pic country"
+      "name pic country _id"
     );
 
+    // Finding player data using user IDs
+    const userIds = user_result.map((user) => user._id);
+    const players_result = await Player.find(
+      { userId: { $in: userIds } },
+      "userId position teamId"
+    );
+
+    // Fetching team details for each player
+    const teamIds = players_result.map((player) => player.teamId);
+    const playerTeams = await Team.find(
+      { _id: { $in: teamIds } },
+      "teamname teamlogo _id"
+    );
+
+    // Constructing team response
     const team_response = {
       teams: teams_result.map((team) => ({
+        teamId: team._id,
         teamname: team.teamname,
         teamlogo: team.teamlogo
           ? `${baseUrl}/uploads/other/${path.basename(team.teamlogo)}`
@@ -276,24 +294,45 @@ router.get("/search", async (req, res) => {
       })),
     };
 
+    // Constructing user response with player and team data
     const user_response = {
-      users: user_result.map((user) => ({
-        name: user.name,
-        pic: user.pic
-          ? `${baseUrl}/uploads/other/${path.basename(user.pic)}`
-          : null,
-        country: user.country,
-      })),
+      users: user_result.map((user) => {
+        const playerData = players_result.find((player) =>
+          player.userId.equals(user._id)
+        );
+        const teamData = playerData
+          ? playerTeams.find((team) => team._id.equals(playerData.teamId))
+          : null;
+        return {
+          userId: user._id,
+          name: user.name,
+          pic: user.pic
+            ? `${baseUrl}/uploads/other/${path.basename(user.pic)}`
+            : null,
+          country: user.country,
+          playerData: playerData
+            ? {
+                ...playerData.toObject(),
+                teamname: teamData ? teamData.teamname : null,
+                teamlogo: teamData
+                  ? `${baseUrl}/uploads/other/${path.basename(
+                      teamData.teamlogo
+                    )}`
+                  : null,
+              }
+            : null,
+        };
+      }),
     };
 
-    //return response..
+    // Return response
     return res.json({
       success: true,
       team_response,
       user_response,
     });
   } catch (error) {
-    return res.status(500).json({ message: "Internal server error..." });
+    return res.status(500).json({ message: "Internal server error." });
   }
 });
 
