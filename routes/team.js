@@ -264,14 +264,14 @@ router.get("/search", async (req, res) => {
     // Finding search results for users
     const user_result = await User.find(
       { name: { $regex: searchRegex } },
-      "name pic country _id"
+      "name pic country _id position"
     );
 
     // Finding player data using user IDs
     const userIds = user_result.map((user) => user._id);
     const players_result = await Player.find(
       { userId: { $in: userIds } },
-      "userId position teamId"
+      "userId  teamId"
     );
 
     // Fetching team details for each player
@@ -310,6 +310,7 @@ router.get("/search", async (req, res) => {
             ? `${baseUrl}/uploads/other/${path.basename(user.pic)}`
             : null,
           country: user.country,
+          position: user.position,
           playerData: playerData
             ? {
                 ...playerData.toObject(),
