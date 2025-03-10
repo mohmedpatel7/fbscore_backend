@@ -552,7 +552,10 @@ router.get("/matchDetails/:matchId", [userauth], async (req, res) => {
         },
       })
       .populate("goals.team", "teamname teamlogo")
-      .populate("mvp", "name pic position");
+      .populate({
+        path: "mvp",
+        populate: { path: "userId", select: "name pic position" },
+      });
 
     if (!match) {
       return res.status(404).json({ message: "Match not found" });
@@ -576,13 +579,21 @@ router.get("/matchDetails/:matchId", [userauth], async (req, res) => {
       mvp: match.mvp
         ? {
             id: match.mvp._id,
-            name: match.mvp.name,
-            pic: match.mvp.pic
-              ? `${baseUrl}/uploads/other/${path.basename(match.mvp.pic)}`
+            name: match.mvp.userId?.name || "Unknown",
+            pic: match.mvp.userId?.pic
+              ? `${baseUrl}/uploads/other/${path.basename(
+                  match.mvp.userId.pic
+                )}`
               : null,
-            position: match.mvp.position || "Unknown",
+            position: match.mvp.userId?.position || "Unknown",
+            teamName: match.mvp.teamId
+              ? match.teamA._id.equals(match.mvp.teamId)
+                ? match.teamA.teamname
+                : match.teamB.teamname
+              : "Unknown",
           }
         : null,
+
       teams: {
         teamA: {
           id: match.teamA._id,
