@@ -19,8 +19,14 @@ const commentSchema = new mongoose.Schema({
 const PostSchema = new mongoose.Schema({
   uploadedBy: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: "User", // Fixed typo from "refrence" to "ref"
+    refPath: "uploaderType", // Dynamic reference based on uploaderType
     required: true,
+  },
+  uploaderType: {
+    type: String,
+    required: true,
+    enum: ["User", "Team"], // Can only be either User or Team
+    default: "User",
   },
   image: {
     type: String,
