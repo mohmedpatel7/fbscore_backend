@@ -843,18 +843,9 @@ router.get("/getPlayerDetailsByUserId/:userId", async (req, res) => {
       return res.status(404).json({ message: "User not found..!" });
     }
 
-    // Fetch the player details using userId
-    const player = await Player.findOne({ userId: userId }).populate(
-      "teamId",
-      "teamname teamlogo country email createdBy"
-    );
-
-    if (!player) {
-      return res.status(404).json({ message: "Player details not found..!" });
-    }
-
     // Calculate age from dob
     const calculateAge = (dob) => {
+      if (!dob) return null;
       const birthDate = new Date(dob);
       const today = new Date();
       let age = today.getFullYear() - birthDate.getFullYear();
@@ -867,6 +858,37 @@ router.get("/getPlayerDetailsByUserId/:userId", async (req, res) => {
       }
       return age;
     };
+
+    // Prepare user data
+    const userData = {
+      userId: user._id,
+      name: user.name,
+      pic: user.pic
+        ? `${baseUrl}/uploads/other/${path.basename(user.pic)}`
+        : null,
+      country: user.country,
+      gender: user.gender,
+      position: user.position,
+      foot: user.foot,
+      email: user.email,
+      dob: user.dob,
+      age: calculateAge(user.dob),
+    };
+
+    // Fetch the player details using userId
+    const player = await Player.findOne({ userId: userId }).populate(
+      "teamId",
+      "teamname teamlogo country email createdBy"
+    );
+
+    // If no player is found, return only user data
+    if (!player) {
+      return res.status(200).json({
+        message: "User is not a player.",
+        player: null,
+        user: userData,
+      });
+    }
 
     // Fetch all player stats for the user across all teams
     const allPlayerStats = await PlayerStats.find({ user_id: userId });
@@ -911,20 +933,7 @@ router.get("/getPlayerDetailsByUserId/:userId", async (req, res) => {
           country: player.teamId.country,
           owner: player.teamId.createdBy,
         },
-        user: {
-          userId: user._id,
-          name: user.name,
-          pic: user.pic
-            ? `${baseUrl}/uploads/other/${path.basename(user.pic)}`
-            : null,
-          country: user.country,
-          gender: user.gender,
-          position: user.position,
-          foot: user.foot,
-          email: user.email,
-          dob: user.dob,
-          age: calculateAge(user.dob),
-        },
+        user: userData,
         stats: {
           totalgoals: totalGoals, // Total from ALL teams
           totalassits: totalAssists, // Total from ALL teams
