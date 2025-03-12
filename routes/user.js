@@ -946,8 +946,147 @@ router.get("/getPlayerDetailsByUserId/:userId", async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Error fetching player details:", error);
     return res.status(500).json({ message: "Internal server error..!" });
+  }
+});
+
+// Admin route to get all users with player details
+router.get("/admin/getAllUsers", async (req, res) => {
+  try {
+    // Verify admin token
+    const adminToken = req.header("admintoken");
+    if (!adminToken) {
+      return res.status(401).json({ message: "Unauthorized access!" });
+    }
+
+    // Fetch all users with basic details
+    const users = await User.find(
+      {},
+      "name pic country gender position foot dob email createdAt"
+    );
+
+    // Calculate age function
+    const calculateAge = (dob) => {
+      if (!dob) return null;
+      const birthDate = new Date(dob);
+      const today = new Date();
+      let age = today.getFullYear() - birthDate.getFullYear();
+      const monthDifference = today.getMonth() - birthDate.getMonth();
+      if (
+        monthDifference < 0 ||
+        (monthDifference === 0 && today.getDate() < birthDate.getDate())
+      ) {
+        age--;
+      }
+      return age;
+    };
+
+    // Process each user and get their player details
+    const usersWithDetails = await Promise.all(
+      users.map(async (user) => {
+        // Prepare user data
+        const userData = {
+          userId: user._id,
+          name: user.name,
+          pic: user.pic
+            ? `${baseUrl}/uploads/other/${path.basename(user.pic)}`
+            : null,
+          country: user.country,
+          gender: user.gender,
+          position: user.position,
+          foot: user.foot,
+          email: user.email,
+          dob: user.dob,
+          age: calculateAge(user.dob),
+          createdAt: user.createdAt,
+        };
+
+        // Fetch player details if they exist
+        const player = await Player.findOne({ userId: user._id }).populate(
+          "teamId",
+          "teamname teamlogo country email createdBy"
+        );
+
+        if (!player) {
+          return {
+            ...userData,
+            isPlayer: false,
+            player: null,
+            stats: null,
+          };
+        }
+
+        // Fetch all player stats
+        const allPlayerStats = await PlayerStats.find({ user_id: user._id });
+        const totalGoals = allPlayerStats.reduce(
+          (sum, stat) => sum + (stat.totalgoals || 0),
+          0
+        );
+        const totalAssists = allPlayerStats.reduce(
+          (sum, stat) => sum + (stat.totalassists || 0),
+          0
+        );
+
+        // Get current team matches
+        const totalMatches = await Match.countDocuments({
+          $and: [
+            {
+              $or: [{ teamA: player.teamId._id }, { teamB: player.teamId._id }],
+            },
+            { status: "Full Time" },
+          ],
+        });
+
+        // Get current team stats
+        const currentPlayerStats = await PlayerStats.findOne({
+          player_id: player._id,
+        });
+
+        return {
+          ...userData,
+          isPlayer: true,
+          player: {
+            playerId: player._id,
+            playerNo: player.playerNo,
+            team: {
+              teamId: player.teamId._id,
+              teamname: player.teamId.teamname,
+              teamemail: player.teamId.email,
+              teamlogo: player.teamId.teamlogo
+                ? `${baseUrl}/uploads/other/${path.basename(
+                    player.teamId.teamlogo
+                  )}`
+                : null,
+              country: player.teamId.country,
+              owner: player.teamId.createdBy,
+            },
+          },
+          stats: {
+            totalGoals,
+            totalAssists,
+            currentGoals: currentPlayerStats
+              ? currentPlayerStats.totalgoals
+              : 0,
+            currentAssists: currentPlayerStats
+              ? currentPlayerStats.totalassists
+              : 0,
+            totalMatches: totalMatches || 0,
+          },
+        };
+      })
+    );
+
+    // Return the processed data with pagination info
+    return res.status(200).json({
+      message: "Users fetched successfully!",
+      totalUsers: usersWithDetails.length,
+      playersCount: usersWithDetails.filter((user) => user.isPlayer).length,
+      nonPlayersCount: usersWithDetails.filter((user) => !user.isPlayer).length,
+      users: usersWithDetails,
+    });
+  } catch (error) {
+    console.error("Error fetching users:", error);
+    return res.status(500).json({ message: "Internal server error!" });
   }
 });
 

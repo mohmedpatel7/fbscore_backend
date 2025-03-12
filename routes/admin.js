@@ -8,6 +8,7 @@ const Player = require("../schema_models/Players");
 const User = require("../schema_models/User");
 const MatchOfficial = require("../schema_models/MatchOfficial");
 const ReqMatchOfficial = require("../schema_models/ReqMatchOfficial");
+const PlayerStats = require("../schema_models/Stats");
 const Match = require("../schema_models/Match");
 const { body, validationResult } = require("express-validator");
 const jwt = require("jsonwebtoken");
@@ -258,17 +259,62 @@ router.get("/getTeams", [adminauth], async (req, res) => {
 
     if (!teams) return res.status(404).json({ message: "No teams found.!" });
 
+    // Get team statistics using Promise.all for parallel processing
+    const teamsWithStats = await Promise.all(
+      teams.map(async (team) => {
+        // Get all matches where the team participated (either as teamA or teamB)
+        const matches = await Match.find({
+          $or: [{ teamA: team._id }, { teamB: team._id }],
+        });
+
+        // Calculate match statistics
+        let totalMatches = matches.length;
+        let wins = 0;
+        let losses = 0;
+        let draws = 0;
+
+        matches.forEach((match) => {
+          // Only count completed matches (Full Time)
+          if (match.status === "Full Time") {
+            const isTeamA = match.teamA.toString() === team._id.toString();
+            const teamScore = isTeamA ? match.score.teamA : match.score.teamB;
+            const opposingScore = isTeamA
+              ? match.score.teamB
+              : match.score.teamA;
+
+            if (teamScore > opposingScore) wins++;
+            else if (teamScore < opposingScore) losses++;
+            else draws++;
+          }
+        });
+
+        // Get total players count
+        const playerCount = await Player.countDocuments({ teamId: team._id });
+
+        return {
+          teamId: team._id,
+          teamname: team.teamname,
+          teamlogo: team.teamlogo
+            ? `${baseUrl}/uploads/other/${path.basename(team.teamlogo)}`
+            : null,
+          country: team.country,
+          createdBy: team.createdBy,
+          email: team.email,
+          stats: {
+            totalMatches,
+            wins,
+            losses,
+            draws,
+            totalPlayers: playerCount,
+          },
+          createdAt: team.createdAt,
+          updatedAt: team.updatedAt,
+        };
+      })
+    );
+
     const response = {
-      teams: teams.map((team) => ({
-        teamId: team._id,
-        teamname: team.teamname,
-        teamlogo: team.teamlogo,
-        country: team.country,
-        createdBy: team.createdBy,
-        email: team.email,
-        createdAt: team.createdAt,
-        updatedAt: team.updatedAt,
-      })),
+      teams: teamsWithStats,
     };
 
     return res.status(200).json({ response });
@@ -371,6 +417,140 @@ router.get("/getPlayerDetails/:Pid", [adminauth], async (req, res) => {
     });
   } catch (error) {
     return res.status(500).json({ message: "Internal server error..!" });
+  }
+});
+
+// Route 7.1:Fecthing list of all users.
+router.get("/getAllUsers", [adminauth], async (req, res) => {
+  try {
+    // Fetch all users with basic details
+    const users = await User.find(
+      {},
+      "name pic country gender position foot dob email createdAt"
+    );
+
+    // Calculate age function
+    const calculateAge = (dob) => {
+      if (!dob) return null;
+      const birthDate = new Date(dob);
+      const today = new Date();
+      let age = today.getFullYear() - birthDate.getFullYear();
+      const monthDifference = today.getMonth() - birthDate.getMonth();
+      if (
+        monthDifference < 0 ||
+        (monthDifference === 0 && today.getDate() < birthDate.getDate())
+      ) {
+        age--;
+      }
+      return age;
+    };
+
+    // Process each user and get their player details
+    const usersWithDetails = await Promise.all(
+      users.map(async (user) => {
+        // Prepare user data
+        const userData = {
+          userId: user._id,
+          name: user.name,
+          pic: user.pic
+            ? `${baseUrl}/uploads/other/${path.basename(user.pic)}`
+            : null,
+          country: user.country,
+          gender: user.gender,
+          position: user.position,
+          foot: user.foot,
+          email: user.email,
+          dob: user.dob,
+          age: calculateAge(user.dob),
+          createdAt: user.createdAt,
+        };
+
+        // Fetch player details if they exist
+        const player = await Player.findOne({ userId: user._id }).populate(
+          "teamId",
+          "teamname teamlogo country email createdBy"
+        );
+
+        if (!player) {
+          return {
+            ...userData,
+            isPlayer: false,
+            player: null,
+            stats: null,
+          };
+        }
+
+        // Fetch all player stats
+        const allPlayerStats = await PlayerStats.find({ user_id: user._id });
+        const totalGoals = allPlayerStats.reduce(
+          (sum, stat) => sum + (stat.totalgoals || 0),
+          0
+        );
+        const totalAssists = allPlayerStats.reduce(
+          (sum, stat) => sum + (stat.totalassists || 0),
+          0
+        );
+
+        // Get current team matches
+        const totalMatches = await Match.countDocuments({
+          $and: [
+            {
+              $or: [{ teamA: player.teamId._id }, { teamB: player.teamId._id }],
+            },
+            { status: "Full Time" },
+          ],
+        });
+
+        // Get current team stats
+        const currentPlayerStats = await PlayerStats.findOne({
+          player_id: player._id,
+        });
+
+        return {
+          ...userData,
+          isPlayer: true,
+          player: {
+            playerId: player._id,
+            playerNo: player.playerNo,
+            team: {
+              teamId: player.teamId._id,
+              teamname: player.teamId.teamname,
+              teamemail: player.teamId.email,
+              teamlogo: player.teamId.teamlogo
+                ? `${baseUrl}/uploads/other/${path.basename(
+                    player.teamId.teamlogo
+                  )}`
+                : null,
+              country: player.teamId.country,
+              owner: player.teamId.createdBy,
+            },
+          },
+          stats: {
+            totalGoals,
+            totalAssists,
+            currentGoals: currentPlayerStats
+              ? currentPlayerStats.totalgoals
+              : 0,
+            currentAssists: currentPlayerStats
+              ? currentPlayerStats.totalassists
+              : 0,
+            totalMatches: totalMatches || 0,
+          },
+        };
+      })
+    );
+
+    // Return the processed data with pagination info
+    return res.status(200).json({
+      message: "Users fetched successfully!",
+      totalUsers: usersWithDetails.length,
+      playersCount: usersWithDetails.filter((user) => user.isPlayer).length,
+      nonPlayersCount: usersWithDetails.filter((user) => !user.isPlayer).length,
+      users: usersWithDetails,
+    });
+  } catch (error) {
+    console.error("Error fetching users:", error);
+    return res.status(500).json({ message: "Internal server error!" });
   }
 });
 
@@ -510,11 +690,47 @@ router.get("/getMatchOfficial", [adminauth], async (req, res) => {
     if (!matchofficial)
       return res.status(404).json({ message: "No data found!" });
 
+    // Get match counts for each official using Promise.all
+    const officialsWithStats = await Promise.all(
+      matchofficial.map(async (official) => {
+        // Count matches created by this official
+        const matchCount = await Match.countDocuments({
+          createdBy: official._id,
+        });
+
+        // Get matches details for this official
+        const matches = await Match.find({ createdBy: official._id })
+          .populate("teamA", "teamname")
+          .populate("teamB", "teamname")
+          .sort({ match_date: -1 })
+          .limit(5); // Get last 5 matches
+
+        return {
+          officialId: official._id,
+          name: official.name,
+          email: official.email,
+          createdAt: official.createdAt,
+          stats: {
+            totalMatches: matchCount,
+            recentMatches: matches.map((match) => ({
+              matchId: match._id,
+              teamA: match.teamA.teamname,
+              teamB: match.teamB.teamname,
+              date: match.match_date,
+              status: match.status,
+            })),
+          },
+        };
+      })
+    );
+
     const response = {
-      matchofficial: matchofficial.map((list) => ({
-        name: list.name,
-        email: list.email,
-      })),
+      totalOfficials: officialsWithStats.length,
+      totalMatches: officialsWithStats.reduce(
+        (sum, official) => sum + official.stats.totalMatches,
+        0
+      ),
+      matchofficial: officialsWithStats,
     };
 
     return res.status(200).json({ response });
