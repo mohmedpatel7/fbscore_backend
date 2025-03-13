@@ -167,7 +167,9 @@ router.get("/fetchTeamRequests", [adminauth], async (req, res) => {
       requests: requests.map((request) => ({
         requestId: request._id,
         teamname: request.teamname,
-        teamlogo: request.teamlogo,
+        teamlogo: request.teamlogo
+          ? `${baseUrl}/uploads/other/${path.basename(request.teamlogo)}`
+          : null,
         owner: request.createdBy,
         country: request.country,
         email: request.email,
@@ -549,7 +551,6 @@ router.get("/getAllUsers", [adminauth], async (req, res) => {
       users: usersWithDetails,
     });
   } catch (error) {
-    console.error("Error fetching users:", error);
     return res.status(500).json({ message: "Internal server error!" });
   }
 });
