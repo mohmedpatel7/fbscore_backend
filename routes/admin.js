@@ -863,4 +863,137 @@ router.get("/matchDetails/:matchId", [adminauth], async (req, res) => {
   }
 });
 
+//Route 13: Delete entity (User/Team/MatchOfficial) with cascading effect
+router.delete("/delete/:type/:id", [adminauth], async (req, res) => {
+  try {
+    const { type, id } = req.params;
+
+    if (!id) {
+      return res.status(400).json({ message: "ID is required!" });
+    }
+
+    switch (type.toLowerCase()) {
+      case "user":
+        // Find and delete user
+        const user = await User.findById(id);
+        if (!user) {
+          return res.status(404).json({ message: "User not found!" });
+        }
+
+        // Find and delete player record
+        const player = await Player.findOne({ userId: id });
+        if (player) {
+          // Delete player stats
+          await PlayerStats.deleteMany({
+            $or: [{ player_id: player._id }, { user_id: id }],
+          });
+          // Delete player
+          await Player.deleteOne({ userId: id });
+        }
+
+        // Delete user
+        await User.deleteOne({ _id: id });
+
+        return res.status(200).json({
+          message: "User and associated data deleted successfully",
+          deletedData: {
+            user: user,
+            player: player,
+          },
+        });
+
+      case "team":
+        // Find and delete team
+        const team = await Team.findById(id);
+        if (!team) {
+          return res.status(404).json({ message: "Team not found!" });
+        }
+
+        // Find all players in the team
+        const teamPlayers = await Player.find({ teamId: id });
+        const playerIds = teamPlayers.map((player) => player._id);
+        const userIds = teamPlayers.map((player) => player.userId);
+
+        // Delete all player stats for team players
+        await PlayerStats.deleteMany({
+          player_id: { $in: playerIds },
+        });
+
+        // Delete all players in the team
+        await Player.deleteMany({ teamId: id });
+
+        // Delete team
+        await Team.deleteOne({ _id: id });
+
+        return res.status(200).json({
+          message: "Team and associated data deleted successfully",
+          deletedData: {
+            team: team,
+            playersAffected: teamPlayers.length,
+          },
+        });
+
+      case "matchofficial":
+        // Find and delete match official
+        const official = await MatchOfficial.findById(id);
+        if (!official) {
+          return res.status(404).json({ message: "Match Official not found!" });
+        }
+
+        // Find matches created by this official
+        const matches = await Match.find({ createdBy: id });
+        const matchIds = matches.map((match) => match._id);
+
+        // Delete player stats for these matches
+        await PlayerStats.updateMany(
+          { "matches.match_id": { $in: matchIds } },
+          { $pull: { matches: { match_id: { $in: matchIds } } } }
+        );
+
+        // Recalculate total goals and assists for affected players
+        const affectedStats = await PlayerStats.find({
+          "matches.match_id": { $in: matchIds },
+        });
+        for (const stat of affectedStats) {
+          const totalGoals = stat.matches.reduce(
+            (sum, match) => sum + (match.goals || 0),
+            0
+          );
+          const totalAssists = stat.matches.reduce(
+            (sum, match) => sum + (match.assists || 0),
+            0
+          );
+          await PlayerStats.updateOne(
+            { _id: stat._id },
+            { $set: { totalgoals: totalGoals, totalassists: totalAssists } }
+          );
+        }
+
+        // Delete matches
+        await Match.deleteMany({ createdBy: id });
+
+        // Delete match official
+        await MatchOfficial.deleteOne({ _id: id });
+
+        return res.status(200).json({
+          message: "Match Official and associated data deleted successfully",
+          deletedData: {
+            official: official,
+            matchesDeleted: matches.length,
+          },
+        });
+
+      default:
+        return res
+          .status(400)
+          .json({ message: "Invalid entity type specified!" });
+    }
+  } catch (error) {
+    return res.status(500).json({
+      message: "Internal server error",
+      error: error.message,
+    });
+  }
+});
+
 module.exports = router;
