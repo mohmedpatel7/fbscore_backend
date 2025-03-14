@@ -205,7 +205,25 @@ router.get("/getTeamDetails", [teamauth], async (req, res) => {
       return res.status(404).json({ message: "Team not found..!" });
     }
 
-    const player = await Player.find({ teamId: teamid }).populate("userId");
+    const players = await Player.find({ teamId: teamid }).populate("userId");
+
+    // Fetch matches where the team has played (either as teamA or teamB)
+    const matches = await Match.find({
+      $or: [{ teamA: teamid }, { teamB: teamid }],
+    });
+
+    // Total matches played
+    const totalMatches = matches.length;
+
+    // Count wins based on score comparison
+    const wins = matches.filter((match) => {
+      if (match.teamA.toString() === teamid.toString()) {
+        return match.score.teamA > match.score.teamB; // Team A won
+      } else if (match.teamB.toString() === teamid.toString()) {
+        return match.score.teamB > match.score.teamA; // Team B won
+      }
+      return false;
+    }).length;
 
     return res.status(200).json({
       message: "Team details fetched.",
@@ -219,10 +237,9 @@ router.get("/getTeamDetails", [teamauth], async (req, res) => {
         email: team.email,
         createdAt: team.createdAt,
       },
-      players: player.map((player) => ({
+      players: players.map((player) => ({
         playerId: player._id,
         playerNo: player.playerNo,
-
         users: {
           userId: player.userId._id,
           name: player.userId.name,
@@ -237,9 +254,13 @@ router.get("/getTeamDetails", [teamauth], async (req, res) => {
           foot: player.userId.foot,
         },
       })),
+      matches: {
+        totalMatches,
+        wins,
+      },
     });
   } catch (error) {
-    return res.status(500).json({ message: "Internel server errror...!" });
+    return res.status(500).json({ message: "Internal server error...!" });
   }
 });
 
@@ -827,6 +848,24 @@ router.get("/getTeamDetails/:teamid", [teamauth], async (req, res) => {
 
     const player = await Player.find({ teamId: teamid }).populate("userId");
 
+    // Fetch matches where the team has played (either as teamA or teamB)
+    const matches = await Match.find({
+      $or: [{ teamA: teamid }, { teamB: teamid }],
+    });
+
+    // Total matches played
+    const totalMatches = matches.length;
+
+    // Count wins based on score comparison
+    const wins = matches.filter((match) => {
+      if (match.teamA.toString() === teamid.toString()) {
+        return match.score.teamA > match.score.teamB; // Team A won
+      } else if (match.teamB.toString() === teamid.toString()) {
+        return match.score.teamB > match.score.teamA; // Team B won
+      }
+      return false;
+    }).length;
+
     return res.status(200).json({
       message: "Team details fetched.",
       team: {
@@ -838,6 +877,8 @@ router.get("/getTeamDetails/:teamid", [teamauth], async (req, res) => {
         createdBy: team.createdBy,
         email: team.email,
         createdAt: team.createdAt,
+        totalMatches,
+        wins,
       },
       players: player.map((player) => ({
         playerId: player._id,
@@ -964,6 +1005,19 @@ router.get("/getCommonTeamDetails/:teamid", async (req, res) => {
 
     const player = await Player.find({ teamId: teamid }).populate("userId");
 
+    // Count total matches played by the team
+    const totalMatches = await Match.countDocuments({
+      $or: [{ teamA: teamid }, { teamB: teamid }],
+    });
+
+    // Count wins based on score (ensure correct field references)
+    const totalWins = await Match.countDocuments({
+      $or: [
+        { teamA: teamid, $expr: { $gt: ["$score.teamA", "$score.teamB"] } },
+        { teamB: teamid, $expr: { $gt: ["$score.teamB", "$score.teamA"] } },
+      ],
+    });
+
     return res.status(200).json({
       message: "Team details fetched.",
       team: {
@@ -975,11 +1029,12 @@ router.get("/getCommonTeamDetails/:teamid", async (req, res) => {
         createdBy: team.createdBy,
         email: team.email,
         createdAt: team.createdAt,
+        totalMatches,
+        totalWins,
       },
       players: player.map((player) => ({
         playerId: player._id,
         playerNo: player.playerNo,
-
         users: {
           userId: player.userId._id,
           name: player.userId.name,
@@ -996,7 +1051,7 @@ router.get("/getCommonTeamDetails/:teamid", async (req, res) => {
       })),
     });
   } catch (error) {
-    return res.status(500).json({ message: "Internel server errror...!" });
+    return res.status(500).json({ message: "Internal server error...!" });
   }
 });
 

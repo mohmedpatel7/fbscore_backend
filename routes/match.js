@@ -831,6 +831,19 @@ router.get("/getTeamDetails/:teamid", async (req, res) => {
 
     const player = await Player.find({ teamId: teamid }).populate("userId");
 
+    // Count total matches played by the team
+    const totalMatches = await Match.countDocuments({
+      $or: [{ teamA: teamid }, { teamB: teamid }],
+    });
+
+    // Count wins based on score
+    const totalWins = await Match.countDocuments({
+      $or: [
+        { teamA: teamid, "score.teamA": { $gt: "score.teamB" } },
+        { teamB: teamid, "score.teamB": { $gt: "score.teamA" } },
+      ],
+    });
+
     return res.status(200).json({
       message: "Team details fetched.",
       team: {
@@ -842,11 +855,12 @@ router.get("/getTeamDetails/:teamid", async (req, res) => {
         createdBy: team.createdBy,
         email: team.email,
         createdAt: team.createdAt,
+        totalMatches,
+        totalWins,
       },
       players: player.map((player) => ({
         playerId: player._id,
         playerNo: player.playerNo,
-
         users: {
           userId: player.userId._id,
           name: player.userId.name,
@@ -863,7 +877,7 @@ router.get("/getTeamDetails/:teamid", async (req, res) => {
       })),
     });
   } catch (error) {
-    return res.status(500).json({ message: "Internel server errror...!" });
+    return res.status(500).json({ message: "Internal server error...!" });
   }
 });
 

@@ -5,6 +5,7 @@ const Admin = require("../schema_models/Admin");
 const Team = require("../schema_models/Team");
 const ReqTeam = require("../schema_models/ReqTeam");
 const Player = require("../schema_models/Players");
+const Post = require("../schema_models/Post");
 const User = require("../schema_models/User");
 const MatchOfficial = require("../schema_models/MatchOfficial");
 const ReqMatchOfficial = require("../schema_models/ReqMatchOfficial");
@@ -993,6 +994,53 @@ router.delete("/delete/:type/:id", [adminauth], async (req, res) => {
       message: "Internal server error",
       error: error.message,
     });
+  }
+});
+
+// Route 14: counting users.sigin required for admin.
+router.get("/counts", [adminauth], async (req, res) => {
+  try {
+    // Count total records in each collection
+    const totalAdmins = await Admin.countDocuments();
+    const totalMatchOfficials = await MatchOfficial.countDocuments();
+    const totalTeams = await Team.countDocuments();
+    const totalUsers = await User.countDocuments();
+    const totalPlayers = await Player.countDocuments();
+
+    // Count how many unique users have become players
+    const usersWhoBecamePlayers = await Player.distinct("userId");
+
+    return res.json({
+      totalAdmins,
+      totalMatchOfficials,
+      totalTeams,
+      totalUsers,
+      totalPlayers,
+      usersWhoBecamePlayers: usersWhoBecamePlayers.length,
+    });
+  } catch (error) {
+    return res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+// Route 15:delete post.
+router.delete("/deletePost/:id", [adminauth], async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Find the post by ID
+    const post = await Post.findById(id);
+    if (!post) {
+      return res.status(404).json({ message: "Post not found." });
+    }
+
+    // Delete the post
+    await Post.findByIdAndDelete(id);
+
+    // Respond with success
+    return res.status(200).json({ message: "Post deleted successfully." });
+  } catch (error) {
+    return res.status(500).json({ message: "Internal server error." });
   }
 });
 
