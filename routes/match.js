@@ -851,10 +851,6 @@ router.get("/matches", async (req, res) => {
     // Merge both results
     const matches = [...fullTimeMatches, ...otherMatches];
 
-    if (!matches.length) {
-      return res.status(404).json({ message: "No matches found!" });
-    }
-
     // Format the response
     const response = matches.map((match) => ({
       matchId: match._id,
