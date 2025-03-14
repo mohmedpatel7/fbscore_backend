@@ -295,9 +295,7 @@ router.get("/getTeams", [adminauth], async (req, res) => {
         return {
           teamId: team._id,
           teamname: team.teamname,
-          teamlogo: team.teamlogo
-            ? `${baseUrl}/uploads/other/${path.basename(team.teamlogo)}`
-            : null,
+          teamlogo: team.teamlogo,
           country: team.country,
           createdBy: team.createdBy,
           email: team.email,
@@ -340,9 +338,7 @@ router.get("/getTeamDetails/:teamid", [adminauth], async (req, res) => {
       message: "Team details fetched.",
       team: {
         teamname: team.teamname,
-        teamlogo: team.teamlogo
-          ? `${baseUrl}/uploads/other/${path.basename(team.teamlogo)}`
-          : null,
+        teamlogo: team.teamlogo,
         country: team.country,
         createdBy: team.createdBy,
         email: team.email,
@@ -354,9 +350,7 @@ router.get("/getTeamDetails/:teamid", [adminauth], async (req, res) => {
         users: {
           userId: player.userId._id,
           name: player.userId.name,
-          pic: player.userId.pic
-            ? `${baseUrl}/uploads/other/${path.basename(player.userId.pic)}`
-            : null,
+          pic: player.userId.pic,
           email: player.userId.email,
           country: player.userId.country,
           gender: player.userId.gender,
@@ -395,19 +389,13 @@ router.get("/getPlayerDetails/:Pid", [adminauth], async (req, res) => {
         team: {
           teamId: player.teamId._id,
           teamname: player.teamId.teamname,
-          teamlogo: player.teamId.teamlogo
-            ? `${baseUrl}/uploads/other/${path.basename(
-                player.teamId.teamlogo
-              )}`
-            : null,
+          teamlogo: player.teamId.teamlogo,
           country: player.teamId.country,
         },
         user: {
           userId: player.userId._id,
           name: player.userId.name,
-          pic: player.userId.pic
-            ? `${baseUrl}/uploads/other/${path.basename(player.userId.pic)}`
-            : null,
+          pic: player.userId.pic,
           country: player.userId.country,
           gender: player.userId.gender,
           position: player.userId.position,
@@ -453,9 +441,7 @@ router.get("/getAllUsers", [adminauth], async (req, res) => {
         const userData = {
           userId: user._id,
           name: user.name,
-          pic: user.pic
-            ? `${baseUrl}/uploads/other/${path.basename(user.pic)}`
-            : null,
+          pic: user.pic,
           country: user.country,
           gender: user.gender,
           position: user.position,
@@ -517,11 +503,7 @@ router.get("/getAllUsers", [adminauth], async (req, res) => {
               teamId: player.teamId._id,
               teamname: player.teamId.teamname,
               teamemail: player.teamId.email,
-              teamlogo: player.teamId.teamlogo
-                ? `${baseUrl}/uploads/other/${path.basename(
-                    player.teamId.teamlogo
-                  )}`
-                : null,
+              teamlogo: player.teamId.teamlogo,
               country: player.teamId.country,
               owner: player.teamId.createdBy,
             },
@@ -576,9 +558,7 @@ router.get("/usersWithoutTeam", [adminauth], async (req, res) => {
       users: userList.map((user) => ({
         userId: user._id,
         name: user.name,
-        pic: user.pic
-          ? `${baseUrl}/uploads/other/${path.basename(user.pic)}`
-          : null,
+        pic: user.pic,
         email: user.email,
         country: user.country,
         gender: user.gender,
@@ -787,30 +767,22 @@ router.get("/matchDetails/:matchId", [adminauth], async (req, res) => {
         teamA: {
           id: match.teamA._id,
           name: match.teamA.teamname,
-          logo: match.teamA.teamlogo
-            ? `${baseUrl}/uploads/other/${path.basename(match.teamA.teamlogo)}`
-            : null,
+          logo: match.teamA.teamlogo,
           players: teamAPlayers.map((player) => ({
             id: player._id,
             name: player.userId.name,
-            pic: player.userId.pic
-              ? `${baseUrl}/uploads/other/${path.basename(player.userId.pic)}`
-              : null,
+            pic: player.userId.pic,
             position: player.userId.position,
           })),
         },
         teamB: {
           id: match.teamB._id,
           name: match.teamB.teamname,
-          logo: match.teamB.teamlogo
-            ? `${baseUrl}/uploads/other/${path.basename(match.teamB.teamlogo)}`
-            : null,
+          logo: match.teamB.teamlogo,
           players: teamBPlayers.map((player) => ({
             id: player._id,
             name: player.userId.name,
-            pic: player.userId.pic
-              ? `${baseUrl}/uploads/other/${path.basename(player.userId.pic)}`
-              : null,
+            pic: player.userId.pic,
             position: player.userId.position,
           })),
         },
@@ -825,30 +797,20 @@ router.get("/matchDetails/:matchId", [adminauth], async (req, res) => {
         team: {
           id: goal.team._id,
           name: goal.team.teamname,
-          logo: goal.team.teamlogo
-            ? `${baseUrl}/uploads/other/${path.basename(goal.team.teamlogo)}`
-            : null,
+          logo: goal.team.teamlogo,
         },
         scorer: goal.scorer
           ? {
               id: goal.scorer._id,
               name: goal.scorer.userId.name,
-              pic: goal.scorer.userId.pic
-                ? `${baseUrl}/uploads/other/${path.basename(
-                    goal.scorer.userId.pic
-                  )}`
-                : null,
+              pic: goal.scorer.userId.pic,
             }
           : null,
         assist: goal.assist
           ? {
               id: goal.assist._id,
               name: goal.assist.userId.name,
-              pic: goal.assist.userId.pic
-                ? `${baseUrl}/uploads/other/${path.basename(
-                    goal.assist.userId.pic
-                  )}`
-                : null,
+              pic: goal.assist.userId.pic,
             }
           : null,
       })),

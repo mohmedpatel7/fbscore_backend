@@ -36,9 +36,7 @@ router.get("/getTeamReq", userauth, async (req, res) => {
     const response = {
       requests: requests.map((req) => ({
         reqId: req._id,
-        teamlogo: req.teamId.teamlogo
-          ? `${baseUrl}/uploads/other/${path.basename(req.teamId.teamlogo)}`
-          : null,
+        teamlogo: req.teamId.teamlogo,
         teamname: req.teamname,
         JeresyNo: req.playerNo,
         date: req.createdAt,
@@ -195,9 +193,7 @@ router.get("/usersWithoutTeam", [teamauth], async (req, res) => {
       users: userList.map((user) => ({
         userId: user._id,
         name: user.name,
-        pic: user.pic
-          ? `${baseUrl}/uploads/other/${path.basename(user.pic)}`
-          : null,
+        pic: user.pic,
         email: user.email,
         country: user.country,
         gender: user.gender,
@@ -237,19 +233,13 @@ router.get("/getPlayerDetails/:Pid", [userauth], async (req, res) => {
         team: {
           teamId: player.teamId._id,
           teamname: player.teamId.teamname,
-          teamlogo: player.teamId.teamlogo
-            ? `${baseUrl}/uploads/other/${path.basename(
-                player.teamId.teamlogo
-              )}`
-            : null,
+          teamlogo: player.teamId.teamlogo,
           country: player.teamId.country,
         },
         user: {
           userId: player.userId._id,
           name: player.userId.name,
-          pic: player.userId.pic
-            ? `${baseUrl}/uploads/other/${path.basename(player.userId.pic)}`
-            : null,
+          pic: player.userId.pic,
           country: player.userId.country,
           gender: player.userId.gender,
           position: player.userId.position,

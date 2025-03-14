@@ -44,7 +44,6 @@ const upload = multer({
   },
 });
 
-
 // Route: Send OTP To Team Owner
 router.post(
   "/sendotp",
@@ -95,7 +94,10 @@ router.post(
     body("country").isString().withMessage("Invalid country..!"),
     body("createdBy").isString().withMessage("Invalid createdBy..!"),
     body("email").isEmail().withMessage("Invalid email..!"),
-    body("password").isString().isLength({ min: 6, max: 18 }).withMessage("Invalid password..!"),
+    body("password")
+      .isString()
+      .isLength({ min: 6, max: 18 })
+      .withMessage("Invalid password..!"),
     body("otp").isString().withMessage("Invalid otp..!"),
   ],
   async (req, res) => {
@@ -120,7 +122,8 @@ router.post(
       }
 
       const team = await Team.findOne({ teamname });
-      if (team) return res.status(400).json({ message: "Team already exists..!" });
+      if (team)
+        return res.status(400).json({ message: "Team already exists..!" });
 
       const salt = await bcrypt.genSalt(10);
       const hashedPassword = await bcrypt.hash(password, salt);
@@ -128,7 +131,9 @@ router.post(
       // Convert file to Base64 if it exists
       let teamLogoBase64 = "";
       if (req.file) {
-        teamLogoBase64 = `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`;
+        teamLogoBase64 = `data:${
+          req.file.mimetype
+        };base64,${req.file.buffer.toString("base64")}`;
       }
 
       const teamcreate = new ReqTeam({
@@ -141,14 +146,15 @@ router.post(
       });
 
       const saved = await teamcreate.save();
-      return res.status(200).json({ message: "Team request sent successfully..!", Data: saved });
+      return res
+        .status(200)
+        .json({ message: "Team request sent successfully..!", Data: saved });
     } catch (error) {
       console.error("Error:", error);
       return res.status(500).json({ message: "Internal server error...!" });
     }
   }
 );
-
 
 //Route 2:Team sign in after registration.
 router.post(
@@ -225,9 +231,7 @@ router.get("/getTeamDetails", [teamauth], async (req, res) => {
       message: "Team details fetched.",
       team: {
         teamname: team.teamname,
-        teamlogo: team.teamlogo
-          ? `${baseUrl}/uploads/other/${path.basename(team.teamlogo)}`
-          : null,
+        teamlogo: team.teamlogo,
         country: team.country,
         createdBy: team.createdBy,
         email: team.email,
@@ -239,9 +243,7 @@ router.get("/getTeamDetails", [teamauth], async (req, res) => {
         users: {
           userId: player.userId._id,
           name: player.userId.name,
-          pic: player.userId.pic
-            ? `${baseUrl}/uploads/other/${path.basename(player.userId.pic)}`
-            : null,
+          pic: player.userId.pic,
           email: player.userId.email,
           country: player.userId.country,
           gender: player.userId.gender,
@@ -303,9 +305,7 @@ router.get("/search", async (req, res) => {
       teams: teams_result.map((team) => ({
         teamId: team._id,
         teamname: team.teamname,
-        teamlogo: team.teamlogo
-          ? `${baseUrl}/uploads/other/${path.basename(team.teamlogo)}`
-          : null,
+        teamlogo: team.teamlogo,
         country: team.country,
         owner: team.createdBy,
       })),
@@ -323,20 +323,14 @@ router.get("/search", async (req, res) => {
         return {
           userId: user._id,
           name: user.name,
-          pic: user.pic
-            ? `${baseUrl}/uploads/other/${path.basename(user.pic)}`
-            : null,
+          pic: user.pic,
           country: user.country,
           position: user.position,
           playerData: playerData
             ? {
                 ...playerData.toObject(),
                 teamname: teamData ? teamData.teamname : null,
-                teamlogo: teamData
-                  ? `${baseUrl}/uploads/other/${path.basename(
-                      teamData.teamlogo
-                    )}`
-                  : null,
+                teamlogo: teamData,
               }
             : null,
         };
@@ -584,20 +578,14 @@ router.get("/getPlayerDetails/:Pid", [teamauth], async (req, res) => {
           teamId: player.teamId._id,
           teamname: player.teamId.teamname,
           teamemail: player.teamId.email,
-          teamlogo: player.teamId.teamlogo
-            ? `${baseUrl}/uploads/other/${path.basename(
-                player.teamId.teamlogo
-              )}`
-            : null,
+          teamlogo: player.teamId.teamlogo,
           country: player.teamId.country,
           owner: player.teamId.createdBy,
         },
         user: {
           userId: player.userId._id,
           name: player.userId.name,
-          pic: player.userId.pic
-            ? `${baseUrl}/uploads/other/${path.basename(player.userId.pic)}`
-            : null,
+          pic: player.userId.pic,
           country: player.userId.country,
           gender: player.userId.gender,
           position: player.userId.position,
@@ -668,11 +656,7 @@ router.get("/matchDetails/:matchId", [teamauth], async (req, res) => {
         ? {
             id: match.mvp._id,
             name: match.mvp.userId?.name || "Unknown",
-            pic: match.mvp.userId?.pic
-              ? `${baseUrl}/uploads/other/${path.basename(
-                  match.mvp.userId.pic
-                )}`
-              : null,
+            pic: match.mvp.userId?.pic,
             position: match.mvp.userId?.position || "Unknown",
             teamName: match.mvp.teamId
               ? match.teamA._id.equals(match.mvp.teamId)
@@ -686,32 +670,24 @@ router.get("/matchDetails/:matchId", [teamauth], async (req, res) => {
         teamA: {
           id: match.teamA._id,
           name: match.teamA.teamname,
-          logo: match.teamA.teamlogo
-            ? `${baseUrl}/uploads/other/${path.basename(match.teamA.teamlogo)}`
-            : null,
+          logo: match.teamA.teamlogo,
           players: teamAPlayers.map((player) => ({
             id: player._id,
             jeresyNo: player.playerNo,
             name: player.userId?.name || "Unknown",
-            pic: player.userId?.pic
-              ? `${baseUrl}/uploads/other/${path.basename(player.userId.pic)}`
-              : null,
+            pic: player.userId?.pic,
             position: player.position,
           })),
         },
         teamB: {
           id: match.teamB._id,
           name: match.teamB.teamname,
-          logo: match.teamB.teamlogo
-            ? `${baseUrl}/uploads/other/${path.basename(match.teamB.teamlogo)}`
-            : null,
+          logo: match.teamB.teamlogo,
           players: teamBPlayers.map((player) => ({
             id: player._id,
             jeresyNo: player.playerNo,
             name: player.userId?.name || "Unknown",
-            pic: player.userId?.pic
-              ? `${baseUrl}/uploads/other/${path.basename(player.userId.pic)}`
-              : null,
+            pic: player.userId?.pic,
             position: player.position,
           })),
         },
@@ -726,19 +702,13 @@ router.get("/matchDetails/:matchId", [teamauth], async (req, res) => {
         team: {
           id: goal.team._id,
           name: goal.team.teamname,
-          logo: goal.team.teamlogo
-            ? `${baseUrl}/uploads/other/${path.basename(goal.team.teamlogo)}`
-            : null,
+          logo: goal.team.teamlogo,
         },
         scorer: goal.scorer
           ? {
               id: goal.scorer._id,
               name: goal.scorer.userId?.name || "Unknown",
-              pic: goal.scorer.userId?.pic
-                ? `${baseUrl}/uploads/other/${path.basename(
-                    goal.scorer.userId.pic
-                  )}`
-                : null,
+              pic: goal.scorer.userId?.pic,
               position: goal.scorer.userId?.position || "Unknown",
             }
           : null,
@@ -746,11 +716,7 @@ router.get("/matchDetails/:matchId", [teamauth], async (req, res) => {
           ? {
               id: goal.assist._id,
               name: goal.assist.userId?.name || "Unknown",
-              pic: goal.assist.userId?.pic
-                ? `${baseUrl}/uploads/other/${path.basename(
-                    goal.assist.userId.pic
-                  )}`
-                : null,
+              pic: goal.assist.userId?.pic,
               position: goal.assist.userId?.position || "Unknown",
             }
           : null,
@@ -802,22 +768,14 @@ router.get("/signinMatches", [teamauth], async (req, res) => {
         ? {
             id: match.teamA._id,
             teamname: match.teamA.teamname,
-            teamlogo: match.teamA.teamlogo
-              ? `${baseUrl}/uploads/other/${path.basename(
-                  match.teamA.teamlogo
-                )}`
-              : null,
+            teamlogo: match.teamA.teamlogo,
           }
         : null,
       teamB: match.teamB
         ? {
             id: match.teamB._id,
             teamname: match.teamB.teamname,
-            teamlogo: match.teamB.teamlogo
-              ? `${baseUrl}/uploads/other/${path.basename(
-                  match.teamB.teamlogo
-                )}`
-              : null,
+            teamlogo: match.teamB.teamlogo,
           }
         : null,
       score: match.score || { teamA: 0, teamB: 0 }, // Default score if missing
@@ -866,9 +824,7 @@ router.get("/getTeamDetails/:teamid", [teamauth], async (req, res) => {
       message: "Team details fetched.",
       team: {
         teamname: team.teamname,
-        teamlogo: team.teamlogo
-          ? `${baseUrl}/uploads/other/${path.basename(team.teamlogo)}`
-          : null,
+        teamlogo: team.teamlogo,
         country: team.country,
         createdBy: team.createdBy,
         email: team.email,
@@ -883,9 +839,7 @@ router.get("/getTeamDetails/:teamid", [teamauth], async (req, res) => {
         users: {
           userId: player.userId._id,
           name: player.userId.name,
-          pic: player.userId.pic
-            ? `${baseUrl}/uploads/other/${path.basename(player.userId.pic)}`
-            : null,
+          pic: player.userId.pic,
           email: player.userId.email,
           country: player.userId.country,
           gender: player.userId.gender,
@@ -1018,9 +972,7 @@ router.get("/getCommonTeamDetails/:teamid", async (req, res) => {
       message: "Team details fetched.",
       team: {
         teamname: team.teamname,
-        teamlogo: team.teamlogo
-          ? `${baseUrl}/uploads/other/${path.basename(team.teamlogo)}`
-          : null,
+        teamlogo: team.teamlogo,
         country: team.country,
         createdBy: team.createdBy,
         email: team.email,
@@ -1034,9 +986,7 @@ router.get("/getCommonTeamDetails/:teamid", async (req, res) => {
         users: {
           userId: player.userId._id,
           name: player.userId.name,
-          pic: player.userId.pic
-            ? `${baseUrl}/uploads/other/${path.basename(player.userId.pic)}`
-            : null,
+          pic: player.userId.pic,
           email: player.userId.email,
           country: player.userId.country,
           gender: player.userId.gender,
