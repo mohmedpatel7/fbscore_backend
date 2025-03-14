@@ -24,18 +24,9 @@ const setOtp = {}; // Temporary storage for OTPs
 // Define path to default profile picture
 // const defaultProfilePath = path.join(__dirname, "../other/defaultprofile.jpg");
 
-// Configure multer for profile picture upload
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, path.join(__dirname, "../uploads")); // Folder for storing uploaded files
-  },
-  filename: (req, file, cb) => {
-    cb(null, Date.now() + path.extname(file.originalname)); // Unique filename
-  },
-});
-
+const storage = multer.memoryStorage(); // Store file in memory
 const upload = multer({
-  storage: storage,
+  storage,
   limits: { fileSize: 3 * 1024 * 1024 }, // 3MB file size limit
   fileFilter: (req, file, cb) => {
     const fileTypes = /jpeg|jpg|png/;
@@ -97,7 +88,7 @@ router.post(
   [
     body("name").isString().withMessage("Name is required..!"),
     body("email").isEmail().withMessage("Invalid Email..!"),
-    body("otp").isString().withMessage("OTP is required..!"), // Validate OTP
+    body("otp").isString().withMessage("OTP is required..!"),
     body("dob").isString().withMessage("Birthdate is required..!"),
     body("gender").isString().withMessage("Gender is required..!"),
     body("country").isString().withMessage("Country is required...!"),
@@ -140,6 +131,12 @@ router.post(
       const salt = await bcrypt.genSalt(10);
       const hashedPassword = await bcrypt.hash(password, salt);
 
+      // Convert image to Base64
+      let profilePic = null;
+      if (req.file) {
+        profilePic = req.file.buffer.toString("base64");
+      }
+
       // Create and save the user
       const user = new User({
         name,
@@ -150,7 +147,7 @@ router.post(
         password: hashedPassword,
         position,
         foot,
-        pic: req.file && req.file.path,
+        pic: profilePic, // Save Base64 image in MongoDB
       });
       await user.save();
 
@@ -161,10 +158,12 @@ router.post(
       const usertoken = jwt.sign({ id: user._id }, JWT_SIGN);
       res.status(201).json({ usertoken });
     } catch (error) {
+      console.log(error);
       res.status(500).json({ message: "Internal server error" });
     }
   }
 );
+
 
 //Route 3:Sign in
 router.post(
