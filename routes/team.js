@@ -27,30 +27,21 @@ const baseUrl = process.env.baseurl;
 // Define path to default profile picture
 const defaultProfilePath = path.join(__dirname, "../other/defaultprofile.jpg");
 
-// Configure multer for profile picture upload
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, path.join(__dirname, "../uploads")); // Folder for storing uploaded files
-  },
-  filename: (req, file, cb) => {
-    cb(null, Date.now() + path.extname(file.originalname)); // Unique filename
-  },
-});
-
+// Store file in memory
+const storage = multer.memoryStorage();
 const upload = multer({
-  storage: storage,
+  storage,
   limits: { fileSize: 3 * 1024 * 1024 }, // 3MB file size limit
   fileFilter: (req, file, cb) => {
     const fileTypes = /jpeg|jpg|png/;
-    const extname = fileTypes.test(
-      path.extname(file.originalname).toLowerCase()
-    );
+    const extname = fileTypes.test(path.extname(file.originalname).toLowerCase());
     const mimetype = fileTypes.test(file.mimetype);
 
     if (mimetype && extname) return cb(null, true);
     cb("Error: Images Only!");
   },
 });
+
 
 // Route: Send OTP To Team Owner
 router.post(
@@ -102,10 +93,7 @@ router.post(
     body("country").isString().withMessage("Invalid country..!"),
     body("createdBy").isString().withMessage("Invalid createdBy..!"),
     body("email").isEmail().withMessage("Invalid email..!"),
-    body("password")
-      .isString()
-      .isLength({ min: 6, max: 18 })
-      .withMessage("Invalid password..!"),
+    body("password").isString().isLength({ min: 6, max: 18 }).withMessage("Invalid password..!"),
     body("otp").isString().withMessage("Invalid otp..!"),
   ],
   async (req, res) => {
@@ -130,30 +118,35 @@ router.post(
       }
 
       const team = await Team.findOne({ teamname });
-      if (team)
-        return res.status(400).json({ message: "Team already exist..!" });
+      if (team) return res.status(400).json({ message: "Team already exists..!" });
 
       const salt = await bcrypt.genSalt(10);
       const hashedPassword = await bcrypt.hash(password, salt);
 
+      // Convert file to Base64 if it exists
+      let teamLogoBase64 = "";
+      if (req.file) {
+        teamLogoBase64 = `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`;
+      }
+
       const teamcreate = new ReqTeam({
         teamname,
-        teamlogo: req.file ? req.file.path : defaultProfilePath,
+        teamlogo: teamLogoBase64, // Store Base64 image in MongoDB
         country,
         createdBy,
         email,
         password: hashedPassword,
       });
+
       const saved = await teamcreate.save();
-      return res
-        .status(200)
-        .json({ message: "Team request sent successfully..!", Data: saved });
+      return res.status(200).json({ message: "Team request sent successfully..!", Data: saved });
     } catch (error) {
-      console.log(error);
-      return res.status(500).json({ message: "Internel server errror...!" });
+      console.error("Error:", error);
+      return res.status(500).json({ message: "Internal server error...!" });
     }
   }
 );
+
 
 //Route 2:Team sign in after registration.
 router.post(
