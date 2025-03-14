@@ -36,7 +36,7 @@ const upload = multer({
     const mimetype = fileTypes.test(file.mimetype);
 
     if (mimetype && extname) return cb(null, true);
-    cb("Error: Images Only!");
+    cb(new Error("Error: Images Only!"));
   },
 });
 
@@ -131,10 +131,12 @@ router.post(
       const salt = await bcrypt.genSalt(10);
       const hashedPassword = await bcrypt.hash(password, salt);
 
-      // Convert image to Base64
+      // Convert image to Base64 (With MIME type)
       let profilePic = null;
       if (req.file) {
-        profilePic = req.file.buffer.toString("base64");
+        profilePic = `data:${
+          req.file.mimetype
+        };base64,${req.file.buffer.toString("base64")}`;
       }
 
       // Create and save the user
@@ -147,7 +149,7 @@ router.post(
         password: hashedPassword,
         position,
         foot,
-        pic: profilePic, // Save Base64 image in MongoDB
+        pic: profilePic, // Save Base64 image with MIME type
       });
       await user.save();
 
@@ -158,12 +160,11 @@ router.post(
       const usertoken = jwt.sign({ id: user._id }, JWT_SIGN);
       res.status(201).json({ usertoken });
     } catch (error) {
-      console.log(error);
+      console.error(error);
       res.status(500).json({ message: "Internal server error" });
     }
   }
 );
-
 
 //Route 3:Sign in
 router.post(
@@ -216,7 +217,6 @@ router.get("/getuser", [userauth], async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    // Function to calculate age from date of birth (dob)
     const calculateAge = (dob) => {
       const birthDate = new Date(dob);
       const today = new Date();
@@ -231,10 +231,7 @@ router.get("/getuser", [userauth], async (req, res) => {
       return age;
     };
 
-    // Check if the user is a player and fetch their team details
     const isPlayer = await Player.findOne({ userId: user }).populate("teamId");
-
-    // Fetch all player stats for the user across all teams
     const allPlayerStats = await PlayerStats.find({ user_id: user });
     const totalGoals = allPlayerStats.reduce(
       (sum, stat) => sum + (stat.totalgoals || 0),
@@ -244,8 +241,6 @@ router.get("/getuser", [userauth], async (req, res) => {
       (sum, stat) => sum + (stat.totalassists || 0),
       0
     );
-
-    // Fetch total matches played for the current team only
     const totalMatches = await Match.countDocuments({
       $and: [
         {
@@ -258,12 +253,9 @@ router.get("/getuser", [userauth], async (req, res) => {
       ],
     });
 
-    // Fetch current player stats for the current team
     const currentPlayerStats = await PlayerStats.findOne({
       player_id: isPlayer?._id,
     });
-
-    // Fetch teammates (excluding the signed-in user)
     let teammates = [];
     if (isPlayer?.teamId) {
       teammates = await Player.find({
@@ -271,10 +263,9 @@ router.get("/getuser", [userauth], async (req, res) => {
         userId: { $ne: user },
       })
         .populate("userId", "name pic email gender country position foot")
-        .select("playerNo"); // Selecting jersey number
+        .select("playerNo");
     }
 
-    // Fetch Matches for the Player's Team
     const fullTimeMatches = await Match.find({
       $or: [{ teamA: isPlayer?.teamId?._id }, { teamB: isPlayer?.teamId?._id }],
       status: "Full Time",
@@ -293,13 +284,10 @@ router.get("/getuser", [userauth], async (req, res) => {
 
     const teamMatches = [...fullTimeMatches, ...otherMatches];
 
-    // Construct response
     const response = {
       id: userdetails._id,
       name: userdetails.name,
-      pic: userdetails.pic
-        ? `${baseUrl}/uploads/other/${path.basename(userdetails.pic)}`
-        : null,
+      pic: userdetails?.pic || "", // Base64 image
       email: userdetails.email,
       age: calculateAge(userdetails.dob),
       dob: userdetails.dob,
@@ -309,23 +297,17 @@ router.get("/getuser", [userauth], async (req, res) => {
       foot: userdetails.foot,
       createdAt: userdetails.createdAt,
       updatedAt: userdetails.updatedAt,
-
       playerDetails: isPlayer
         ? {
             playerId: isPlayer._id,
             teamname: isPlayer.teamId?.teamname || "Unknown Team",
-            teamlogo: isPlayer.teamId?.teamlogo
-              ? `${baseUrl}/uploads/other/${path.basename(
-                  isPlayer.teamId.teamlogo
-                )}`
-              : null,
+            teamlogo: isPlayer.teamId?.teamlogo || "", // Base64 logo
             jeresyNo: isPlayer.playerNo || "N/A",
             teamcountry: isPlayer.teamId?.country || "N/A",
             teamowner: isPlayer.teamId?.createdBy || "N/A",
             teamemail: isPlayer.teamId?.email || "N/A",
           }
         : null,
-
       stats: {
         totalgoals: totalGoals,
         totalassists: totalAssists,
@@ -335,14 +317,11 @@ router.get("/getuser", [userauth], async (req, res) => {
           : 0,
         totalmatches: totalMatches || 0,
       },
-
       teammates: teammates.map((player) => ({
         playerId: player._id || "N/A",
         userId: player.userId._id || "N/A",
         name: player.userId.name || "N/A",
-        pic: player.userId.pic
-          ? `${baseUrl}/uploads/other/${path.basename(player.userId.pic)}`
-          : null,
+        pic: player.userId.pic || "", // Base64 image
         email: player.userId.email || "N/A",
         gender: player.userId.gender || "N/A",
         country: player.userId.country || "N/A",
@@ -350,29 +329,20 @@ router.get("/getuser", [userauth], async (req, res) => {
         foot: player.userId.foot || "N/A",
         jeresyNo: player.playerNo || "N/A",
       })),
-
       matches: teamMatches.map((match) => ({
         matchId: match._id,
         teamA: match.teamA
           ? {
               id: match.teamA._id,
               teamname: match.teamA.teamname,
-              teamlogo: match.teamA.teamlogo
-                ? `${baseUrl}/uploads/other/${path.basename(
-                    match.teamA.teamlogo
-                  )}`
-                : null,
+              teamlogo: match.teamA.teamlogo || "", // Base64 logo
             }
           : null,
         teamB: match.teamB
           ? {
               id: match.teamB._id,
               teamname: match.teamB.teamname,
-              teamlogo: match.teamB.teamlogo
-                ? `${baseUrl}/uploads/other/${path.basename(
-                    match.teamB.teamlogo
-                  )}`
-                : null,
+              teamlogo: match.teamB.teamlogo || "", // Base64 logo
             }
           : null,
         score: match.score || { teamA: 0, teamB: 0 },

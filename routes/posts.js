@@ -11,8 +11,6 @@ const dotenv = require("dotenv");
 dotenv.config();
 const baseUrl = process.env.baseurl;
 
-// Define path to default profile picture
-const defaultProfilePath = path.join(__dirname, "../other/defaultprofile.jpg");
 
 // Configure multer for profile picture upload
 const storage = multer.diskStorage({
