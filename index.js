@@ -14,6 +14,11 @@ app.use(express.json());
 app.use("/uploads/posts", express.static(path.join(__dirname, "post_dir")));
 app.use("/uploads/other", express.static(path.join(__dirname, "uploads")));
 
+// Default route for Vercel
+app.get("/", (req, res) => {
+  res.send("<h1>Welcome to Mohmed's FBScore Backend API 🚀</h1><p>Backend is running successfully!</p>");
+});
+
 app.use("/api/auth", require("./routes/user"));
 app.use("/api/team", require("./routes/team"));
 app.use("/api/player", require("./routes/player"));
