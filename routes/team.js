@@ -757,10 +757,6 @@ router.get("/signinMatches", [teamauth], async (req, res) => {
     // Merge both results
     const Matches = [...fullTimeMatches, ...otherMatches];
 
-    if (!Matches.length) {
-      return res.status(404).json({ message: "No matches found!" });
-    }
-
     // Format the response
     const response = Matches.map((match) => ({
       matchId: match._id || 0,
