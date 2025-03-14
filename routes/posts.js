@@ -11,57 +11,48 @@ const dotenv = require("dotenv");
 dotenv.config();
 const baseUrl = process.env.baseurl;
 
-
-// Configure multer for profile picture upload
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, path.join(__dirname, "../post_dir")); // Folder for storing uploaded files
-  },
-  filename: (req, file, cb) => {
-    cb(null, Date.now() + path.extname(file.originalname)); // Unique filename
-  },
-});
-
+const storage = multer.memoryStorage(); // Store in memory
 const upload = multer({
-  storage: storage,
-  limits: { fileSize: 3 * 1024 * 1024 }, // 3MB file size limit
+  storage,
+  limits: { fileSize: 3 * 1024 * 1024 }, // 3MB limit
   fileFilter: (req, file, cb) => {
     const fileTypes = /jpeg|jpg|png/;
     const extname = fileTypes.test(
       path.extname(file.originalname).toLowerCase()
     );
     const mimetype = fileTypes.test(file.mimetype);
-
     if (mimetype && extname) return cb(null, true);
-    cb("Error: Images Only!");
+    cb(new Error("Error: Images Only!"));
   },
 });
 
-//Route 1:Upload post.Sign in required for user..
+// Route 1: Upload User Post (Base64)
 router.post(
   "/uploadPost",
   [userauth],
-  [upload.single("image")],
+  upload.single("image"),
   async (req, res) => {
     try {
       const { description } = req.body;
       const uploadedBy = req.user.id;
 
-      //Validate description..
+      // Validate description
       if (!description) {
         return res.status(400).json({ error: "Please enter a description." });
       }
 
-      //Handle file upload..
+      // Convert image to Base64
       let imagePath = null;
       if (req.file) {
-        imagePath = req.file.path; // save file path
+        imagePath = `data:${
+          req.file.mimetype
+        };base64,${req.file.buffer.toString("base64")}`;
       }
 
       const newPost = new Post({
         uploadedBy,
         uploaderType: "User",
-        image: imagePath,
+        image: imagePath, // Save Base64 in MongoDB
         description,
       });
 
@@ -73,31 +64,33 @@ router.post(
   }
 );
 
-//Route 1.1:Upload post.Sign in required for teamowner..
+// Route 1.1: Upload Team Post (Base64)
 router.post(
   "/uploadTeamPost",
   [teamauth],
-  [upload.single("image")],
+  upload.single("image"),
   async (req, res) => {
     try {
       const { description } = req.body;
       const uploadedBy = req.user.teamId;
 
-      //Validate description..
+      // Validate description
       if (!description) {
         return res.status(400).json({ error: "Please enter a description." });
       }
 
-      //Handle file upload..
+      // Convert image to Base64
       let imagePath = null;
       if (req.file) {
-        imagePath = req.file.path; // save file path
+        imagePath = `data:${
+          req.file.mimetype
+        };base64,${req.file.buffer.toString("base64")}`;
       }
 
       const newPost = new Post({
         uploadedBy,
         uploaderType: "Team",
-        image: imagePath,
+        image: imagePath, // Save Base64 in MongoDB
         description,
       });
 
@@ -147,9 +140,8 @@ router.get("/post", async (req, res) => {
 
           return {
             id: post._id,
-            image: post.image
-              ? `${baseUrl}/uploads/posts/${path.basename(post.image)}`
-              : null,
+            image: post.image,
+
             description: post.description,
             // Handle both team and user posts using uploaderType
             uploadedBy_name: isTeam
@@ -157,23 +149,13 @@ router.get("/post", async (req, res) => {
               : post.uploadedBy?.name || "Unknown User",
             uploadedBy_pic: isTeam
               ? post.uploadedBy?.teamlogo
-                ? `${baseUrl}/uploads/other/${path.basename(
-                    post.uploadedBy.teamlogo
-                  )}`
-                : null
-              : post.uploadedBy?.pic
-              ? `${baseUrl}/uploads/other/${path.basename(post.uploadedBy.pic)}`
-              : null,
+              : post.uploadedBy?.pic,
             isTeamPost: isTeam,
             likes: post.likes.length,
             comment: post.comments.map((comment) => ({
               id: comment._id,
               user_name: comment.userId?.name || "Unknown User",
-              user_pic: comment.userId?.pic
-                ? `${baseUrl}/uploads/other/${path.basename(
-                    comment.userId?.pic
-                  )}`
-                : null,
+              user_pic: comment.userId?.pic,
               comments: comment.comment,
               date: comment.date,
             })),
@@ -218,21 +200,15 @@ router.get("/siginUserPost", [userauth], async (req, res) => {
         }
         return {
           id: post._id,
-          image: post.image
-            ? `${baseUrl}/uploads/posts/${path.basename(post.image)}`
-            : null,
+          image: post.image,
           description: post.description,
           uploadedBy_name: post.uploadedBy?.name || "Unknown User",
-          uploadedBy_pic: post.uploadedBy?.pic
-            ? `${baseUrl}/uploads/other/${path.basename(post.uploadedBy?.pic)}`
-            : null,
+          uploadedBy_pic: post.uploadedBy?.pic,
           likes: post.likes.length,
           comment: post.comments.map((comment) => ({
             id: comment._id,
             user_name: comment.userId?.name || "Unknown User",
-            user_pic: comment.userId?.pic
-              ? `${baseUrl}/uploads/other/${path.basename(comment.userId?.pic)}`
-              : null,
+            user_pic: comment.userId?.pic,
             comments: comment.comment,
             date: comment.date,
           })),
@@ -276,23 +252,15 @@ router.get("/signInTeamPost", [teamauth], async (req, res) => {
         }
         return {
           id: post._id,
-          image: post.image
-            ? `${baseUrl}/uploads/posts/${path.basename(post.image)}`
-            : null,
+          image: post.image,
           description: post.description,
           uploadedBy_name: post.uploadedBy?.teamname || "Unknown Team",
-          uploadedBy_pic: post.uploadedBy?.teamlogo
-            ? `${baseUrl}/uploads/other/${path.basename(
-                post.uploadedBy?.teamlogo
-              )}`
-            : null,
+          uploadedBy_pic: post.uploadedBy?.teamlogo,
           likes: post.likes.length,
           comment: post.comments.map((comment) => ({
             id: comment._id,
             user_name: comment.userId?.name || "Unknown User",
-            user_pic: comment.userId?.pic
-              ? `${baseUrl}/uploads/other/${path.basename(comment.userId?.pic)}`
-              : null,
+            user_pic: comment.userId?.pic,
             comments: comment.comment,
             date: comment.date,
           })),
