@@ -763,7 +763,7 @@ router.get("/signinMatches", [teamauth], async (req, res) => {
 
     // Format the response
     const response = Matches.map((match) => ({
-      matchId: match._id,
+      matchId: match._id || 0,
       teamA: match.teamA
         ? {
             id: match.teamA._id,
@@ -779,9 +779,9 @@ router.get("/signinMatches", [teamauth], async (req, res) => {
           }
         : null,
       score: match.score || { teamA: 0, teamB: 0 }, // Default score if missing
-      date: match.match_date,
-      time: match.match_time,
-      status: match.status,
+      date: match.match_date || 0,
+      time: match.match_time || 0,
+      status: match.status || 0,
     }));
 
     return res.status(200).json({ matches: response });

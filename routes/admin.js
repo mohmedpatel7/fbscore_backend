@@ -24,18 +24,9 @@ require("dotenv").config();
 const JWT_SIGN = process.env.JWT_SIGN;
 const baseUrl = process.env.baseUrl;
 
-// Configure multer for profile picture upload
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, path.join(__dirname, "../uploads")); // Folder for storing uploaded files
-  },
-  filename: (req, file, cb) => {
-    cb(null, Date.now() + path.extname(file.originalname)); // Unique filename
-  },
-});
-
+const storage = multer.memoryStorage(); // Store file in memory
 const upload = multer({
-  storage: storage,
+  storage,
   limits: { fileSize: 3 * 1024 * 1024 }, // 3MB file size limit
   fileFilter: (req, file, cb) => {
     const fileTypes = /jpeg|jpg|png/;
@@ -45,7 +36,7 @@ const upload = multer({
     const mimetype = fileTypes.test(file.mimetype);
 
     if (mimetype && extname) return cb(null, true);
-    cb("Error: Images Only!");
+    cb(new Error("Error: Images Only!"));
   },
 });
 
@@ -105,7 +96,6 @@ router.post(
 
       res.json({ admintoken });
     } catch (error) {
-      console.error(error);
       res.status(500).json({ error: "Server error" });
     }
   }
