@@ -149,6 +149,7 @@ router.post(
         .status(200)
         .json({ message: "Team request sent successfully..!", Data: saved });
     } catch (error) {
+      console.log(error);
       return res.status(500).json({ message: "Internel server errror...!" });
     }
   }
