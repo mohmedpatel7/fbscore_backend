@@ -168,9 +168,7 @@ router.get("/fetchTeamRequests", [adminauth], async (req, res) => {
       requests: requests.map((request) => ({
         requestId: request._id,
         teamname: request.teamname,
-        teamlogo: request.teamlogo
-          ? `${baseUrl}/uploads/other/${path.basename(request.teamlogo)}`
-          : null,
+        teamlogo: request.teamlogo,
         owner: request.createdBy,
         country: request.country,
         email: request.email,

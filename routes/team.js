@@ -28,17 +28,19 @@ const baseUrl = process.env.baseurl;
 const defaultProfilePath = path.join(__dirname, "../other/defaultprofile.jpg");
 
 // Store file in memory
-const storage = multer.memoryStorage();
+const storage = multer.memoryStorage(); // Store file in memory
 const upload = multer({
   storage,
   limits: { fileSize: 3 * 1024 * 1024 }, // 3MB file size limit
   fileFilter: (req, file, cb) => {
     const fileTypes = /jpeg|jpg|png/;
-    const extname = fileTypes.test(path.extname(file.originalname).toLowerCase());
+    const extname = fileTypes.test(
+      path.extname(file.originalname).toLowerCase()
+    );
     const mimetype = fileTypes.test(file.mimetype);
 
     if (mimetype && extname) return cb(null, true);
-    cb("Error: Images Only!");
+    cb(new Error("Error: Images Only!"));
   },
 });
 
