@@ -406,7 +406,7 @@ router.get("/getAllUsers", [adminauth], async (req, res) => {
     // Fetch all users with basic details
     const users = await User.find(
       {},
-      "name pic country gender position foot dob email createdAt"
+      "name pic country gender position foot dob email createdAt active"
     );
 
     // Calculate age function
