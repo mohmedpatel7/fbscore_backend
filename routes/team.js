@@ -150,7 +150,6 @@ router.post(
         .status(200)
         .json({ message: "Team request sent successfully..!", Data: saved });
     } catch (error) {
-      console.error("Error:", error);
       return res.status(500).json({ message: "Internal server error...!" });
     }
   }
@@ -175,6 +174,13 @@ router.post(
       const teamOwner = await Team.findOne({ email });
       if (!teamOwner)
         return res.status(404).json({ message: "Invalid email or password.!" });
+
+      // Check if team is active
+      if (!teamOwner.active) {
+        return res
+          .status(403)
+          .json({ message: "Your team is deactivated. Contact support." });
+      }
 
       const isPasswordValid = await bcrypt.compare(
         password,

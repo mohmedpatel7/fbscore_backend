@@ -994,4 +994,42 @@ router.delete("/deletePost/:id", [adminauth], async (req, res) => {
   }
 });
 
+//Route 16: Admin route to activate/deactivate users or teams
+router.put(
+  "/changeStatus",
+  [
+    body("id").notEmpty().withMessage("ID is required."),
+    body("type")
+      .isIn(["user", "team"])
+      .withMessage("Type must be 'user' or 'team'."),
+    body("status").isBoolean().withMessage("Status must be true or false."),
+  ],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { id, type, status } = req.body;
+
+    try {
+      let model = type === "user" ? User : Team;
+      let account = await model.findById(id);
+
+      if (!account) {
+        return res.status(404).json({ message: `${type} not found.` });
+      }
+
+      account.active = status;
+      await account.save();
+
+      return res
+        .status(200)
+        .json({ message: `${type} status updated successfully.` });
+    } catch (error) {
+      return res.status(500).json({ message: "Internal server error." });
+    }
+  }
+);
+
 module.exports = router;

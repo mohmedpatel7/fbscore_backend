@@ -188,6 +188,13 @@ router.post(
         return res.status(400).json({ message: "Invalid email or password" });
       }
 
+      // Check if user is active
+      if (!user.active) {
+        return res
+          .status(403)
+          .json({ message: "Your account is deactivated. Contact support." });
+      }
+
       //cheaking password..
       let confirpassword = await bcrypt.compare(password, user.password);
       if (!confirpassword) {

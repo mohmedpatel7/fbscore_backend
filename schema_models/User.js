@@ -38,6 +38,10 @@ const User = new mongoose.Schema(
     pic: {
       type: String,
     },
+    active: {
+      type: Boolean,
+      default: true, // Auto-set to active on signup
+    },
   },
   {
     timestamps: true,

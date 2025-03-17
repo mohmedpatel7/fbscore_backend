@@ -27,6 +27,10 @@ const TeamSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    active: {
+      type: Boolean,
+      default: true, // Auto-set to active on signup
+    },
   },
   {
     timestamps: true,
