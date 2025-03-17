@@ -1004,7 +1004,6 @@ router.put(
     body("type")
       .isIn(["user", "team"])
       .withMessage("Type must be 'user' or 'team'."),
-    body("status").isBoolean().withMessage("Status must be true or false."),
   ],
   async (req, res) => {
     const errors = validationResult(req);
@@ -1012,7 +1011,7 @@ router.put(
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const { id, type, status } = req.body;
+    const { id, type } = req.body;
 
     try {
       let model = type === "user" ? User : Team;
@@ -1022,12 +1021,14 @@ router.put(
         return res.status(404).json({ message: `${type} not found.` });
       }
 
-      account.active = status;
+      // Toggle the status
+      account.active = !account.active;
       await account.save();
 
-      return res
-        .status(200)
-        .json({ message: `${type} status updated successfully.` });
+      return res.status(200).json({
+        message: `${type} status updated successfully.`,
+        active: account.active,
+      });
     } catch (error) {
       return res.status(500).json({ message: "Internal server error." });
     }
