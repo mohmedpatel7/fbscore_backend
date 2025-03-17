@@ -298,6 +298,7 @@ router.get("/getTeams", [adminauth], async (req, res) => {
           },
           createdAt: team.createdAt,
           updatedAt: team.updatedAt,
+          active: team.active,
         };
       })
     );
@@ -440,6 +441,7 @@ router.get("/getAllUsers", [adminauth], async (req, res) => {
           dob: user.dob,
           age: calculateAge(user.dob),
           createdAt: user.createdAt,
+          active: user.active,
         };
 
         // Fetch player details if they exist
