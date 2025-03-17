@@ -30,20 +30,23 @@ router.get("/getTeamReq", userauth, async (req, res) => {
 
     // If no requests found
     if (requests.length === 0) {
-      return res.status(404).json({ message: "No requests found!" });
+      return res
+        .status(404)
+        .json({ message: "No requests found!", totalRequests: 0 });
     }
 
     const response = {
+      totalRequests: requests.length, // Count total requests
       requests: requests.map((req) => ({
         reqId: req._id,
         teamlogo: req.teamId.teamlogo,
-        teamname: req.teamname,
+        teamname: req.teamId.teamname, // Fixed `teamname` (should be from `teamId`)
         JeresyNo: req.playerNo,
         date: req.createdAt,
       })),
     };
 
-    return res.status(200).json({ response });
+    return res.status(200).json(response);
   } catch (error) {
     return res.status(500).json({ message: "Internal server error!" });
   }
