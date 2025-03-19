@@ -1028,14 +1028,14 @@ router.put(
 // Route 10:Get team names list.sigin required for match official.
 router.get("/getTeamNames", [matchofficialauth], async (req, res) => {
   try {
-    const data = await Team.find().select("teamname teamlogo _id");
-    if (!data) return res.status(404).json({ message: "Not found!" });
+    const data = await Team.find({ active: true }).select("teamname teamlogo _id");
+    if (!data.length) return res.status(404).json({ message: "No active teams found!" });
 
     const response = {
-      data: data.map((teams) => ({
-        teamId: teams._id,
-        teamname: teams.teamname,
-        teamlogo: teams.teamlogo,
+      data: data.map((team) => ({
+        teamId: team._id,
+        teamname: team.teamname,
+        teamlogo: team.teamlogo,
       })),
     };
 
@@ -1044,6 +1044,7 @@ router.get("/getTeamNames", [matchofficialauth], async (req, res) => {
     return res.status(500).json({ message: "Internal server error" });
   }
 });
+
 
 // Route 11: Fetching signin match official created matches.
 router.get("/signinMatches", [matchofficialauth], async (req, res) => {
